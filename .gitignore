@@ -11,7 +11,8 @@ chapters/
 frames/
 scenes/
 shots/
+/Sintel2010-720p/
+/Netflix_Open_Content_Meridian/
 **/*.mp4
-**/*.json
 **/*.vtt
 */*.txt

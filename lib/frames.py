@@ -148,94 +148,6 @@ class VideoFrames:
 
     return stream_info
 
-  def extract_frames(self, force, max_res = (750, 500), sample_rate_fps=1):
-
-    video = urlparse(self.video_file)
-    video_file = video.path
-    video_dir = Path(video_file).stem
-    frames_file = os.path.join(self.video_asset_dir(), 'frames.json')
-
-    # input check: video is a file or https 
-    if video.scheme not in ['https', 'file', '']:
-        raise Exception('input video must be a local file path or use https')
-
-    # input check: file scheme video exists
-    if video.scheme == 'file' and not os.path.exists(video_file):
-        raise Exception('input video does not exist')
-
-    # check to see if the frame info already exists
-    if os.path.exists(frames_file) and force == False:
-        with open(frames_file, 'r', encoding="utf-8") as f:
-            self.frames = json.loads(f.read())
-        print(f"  extract_frames: found {len(self.frames)} frames. SKIPPING... Use force=True to if you want to force running frame extraction.")
-        return
-    
-    frame_dir = os.path.join(video_dir, 'frames')
-    util.mkdir(frame_dir)
-
-    t0 = time.time()
-    video_filters = []
-    video_stream = self.stream_info['video_stream']
-
-    # need deinterlacing
-    progressive = video_stream['progressive']
-    if not progressive:
-        video_filters.append('yadif')
-
-    # downscale image
-    dw, dh = video_stream['display_resolution']
-    factor = max((max_res[0] / dw), (max_res[1] / dh))
-    w = round((dw * factor) / 2) * 2
-    h = round((dh * factor) / 2) * 2
-    video_filters.append(f"scale={w}x{h}")
-
-    # ffmpeg -ss 588 -i f"{self.video_file}" -vf "yadif,scale=iw*sar:ih" -frames:v 1 test2.jpg
-    
-    command = [
-        'ffmpeg',
-        '-v',
-        'quiet',
-        '-i',
-        shlex.quote(self.video_file),
-        # '-t',
-        # str(60),
-        '-vf',
-        f"{','.join(video_filters)}",
-        '-r',
-        str(1),
-        f"{shlex.quote(frame_dir)}/frames%07d.jpg"
-    ]
-
-    print(f"  Resizing: {dw}x{dh} -> {w}x{h} (Progressive? {progressive})")
-    print(f"  Command: {command}")
-    
-    # shlex.quote will place harmful input in quotes so it can't be executed by the shell
-    # nosemgrep Rule ID: dangerous-subprocess-use-audit
-    subprocess.run(
-        command,
-        shell=False,
-        stdout=subprocess.DEVNULL,
-        # stderr=subprocess.DEVNULL
-    )
-
-    t1 = time.time()
-    print(f"  extract_frames: elapsed {round(t1 - t0, 2)}s")
-
-    # return jpeg files
-    jpeg_frames = sorted(glob.glob(f"{frame_dir}/*.jpg"))
-
-    self.frames = []
-    index = 0
-    for jpeg_frame in jpeg_frames[2:]:
-        newFrame = {}
-        newFrame['image_file'] = jpeg_frame
-        newFrame['timestamp_millis'] = int(index * 1000)
-        newFrame['id'] = index
-        self.frames.append(newFrame)
-        index+=1
-                
-    return 
-
   def fps_extract_frames(self, force, max_res=(750, 500), sample_rate_fps=1):
     """
     Extract individual frames from a video file as JPEG images.
@@ -538,6 +450,11 @@ class VideoFrames:
         
         """
 
+        video = urlparse(self.video_file)
+        video_path = video.path
+        video_dir = self.video_dir()
+        frames_file = os.path.join(self.video_asset_dir(), 'frames.json')
+      
         titan_model_id = config['TITAN_MODEL_ID']
         accept = 'application/json'
         content_type = 'application/json'
@@ -571,7 +488,53 @@ class VideoFrames:
             frame['titan_multimodal_embedding_model_id'] = titan_model_id
             self.cost_embeddings = self.cost_embeddings + 0.00006
 
+        util.save_to_file(frames_file, self.frames)
+
+        # save embeddings
+        util.save_to_file(fastpath_embeddings_file, self.frames)
+        self.store_fastpath_results("frames-embeddings.json")
+        
         return
 
-    
+  def load_titan_multimodal_embeddings(self):
+        """
+        Loads precomputed image embeddings for a video. 
+        
+        Args:
+           None
+        
+        """
+
+        self.load_fastpath_results("frames-embeddings.json")           
+        self.cost_embeddings = len(self.frames) + 0.00006
+      
+        return
   
+  def store_fastpath_results(self, result_file_name):
+      
+        fastpath_dir = f"./fastpath/{ self.video_stem() }"
+        fastpath_file = f"./fastpath/{ self.video_stem() }/{ result_file_name }"
+    
+        # check to see if there is a fastpath folder for this video 
+        if not os.path.exists(fastpath_dir):
+            util.mkdir(fastpath_dir)
+
+        # save results
+        util.save_to_file(fastpath_file, self.frames)
+    
+        return
+      
+  def load_fastpath_results(self, result_file_name):
+      
+        fastpath_dir = f"./fastpath/{ self.video_stem() }"
+        fastpath_file = f"./fastpath/{ self.video_stem() }/{ result_file_name }"
+    
+        # check to see if the frame info already exists
+        if os.path.exists(fastpath_file):
+            with open(fastpath_file, 'r', encoding="utf-8") as f:
+                self.frames = json.loads(f.read())
+            print(f"  load_fastpath_results: loaded frames from { fastpath_file }")
+        else:
+            print(f"  load_fastpath_results: no stored frames exist at { fastpath_file }.  Run with FASTPATH=False to generate results")  
+            
+        return

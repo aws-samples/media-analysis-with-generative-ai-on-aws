@@ -10,6 +10,7 @@ class Shots():
     def __init__(self, videoframes, method="RekognitionShots", min_similarity = 0.80, force=False):
         self.shots = []
         shots_file = os.path.join(videoframes.video_asset_dir(), 'shots.json')
+        self.video_stem = videoframes.video_stem()
 
         if os.path.exists(shots_file) and force == False:
             pass # keep the existing data
@@ -163,6 +164,34 @@ class Shots():
 
         return shots
 
+    def store_fastpath_results(self, result_file_name):
+      
+        fastpath_dir = f"./fastpath/{ self.video_stem }"
+        fastpath_file = f"./fastpath/{ self.video_stem }/{ result_file_name }"
+    
+        # check to see if there is a fastpath folder for this video 
+        if not os.path.exists(fastpath_dir):
+            util.mkdir(fastpath_dir)
+
+        # save results
+        util.save_to_file(fastpath_file, self.shots)
+    
+        return
+      
+    def load_fastpath_results(self, result_file_name):
+      
+        fastpath_dir = f"./fastpath/{ self.video_stem }"
+        fastpath_file = f"./fastpath/{ self.video_stem }/{ result_file_name }"
+    
+        # check to see if the frame info already exists
+        if os.path.exists(fastpath_file):
+            with open(fastpath_file, 'r', encoding="utf-8") as f:
+                self.shots = json.loads(f.read())
+            print(f"  load_fastpath_results: loaded shots from { fastpath_file }")
+        else:
+            print(f"  load_fastpath_results: no stored shots exist at { fastpath_file }.  Run with FASTPATH=False to generate results")  
+            
+        return
 
 class Shot():
 
