@@ -32,7 +32,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 
-PYTHON_TIMEOUT = 180
+PYTHON_TIMEOUT = 900
 PYTHON_RUNTIME = "python3.12"
 DEFAULT_ALIAS = "TSTALIASID"
 DEFAULT_CI_ACTION_GROUP_NAME = "CodeInterpreterAction"
