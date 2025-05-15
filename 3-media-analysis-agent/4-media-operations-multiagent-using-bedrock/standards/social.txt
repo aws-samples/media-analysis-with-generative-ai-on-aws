@@ -1,0 +1,23 @@
+**Document Title:** Social Media Guidelines For Video Synopsis
+**Department:** Social Media Operations
+**Last Updated:** March 2025
+**Document Number:** SOC-MED-001
+
+## Video Synopsis Requirements
+
+### 1. Description Format
+- Description is less than 75 words
+- Format: Hook + Main Point + Call-to-action
+- Must include name of the film, cast, and their roles (Films) or venue name with teams and athletes (Sports)
+
+### 2. Style Requirements
+- Use casual tone
+- Include 2-3 hashtags
+- Add relevant @mentions
+- Use emoji when applicable
+
+### 3. OUTPUT SCHEMA
+```json
+{
+    "description": "[Insert Social Media Copy]"
+}
