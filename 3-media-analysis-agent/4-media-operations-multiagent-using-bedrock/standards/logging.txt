@@ -1,0 +1,41 @@
+**Document Title:** Internal Logging Standards For Video Synopsis
+**Department:** Technical Operations
+**Last Updated:** March 2025
+**Document Number:** LOG-INT-001
+
+## Internal Logging Requirements
+
+### 1. Core Content Requirements
+- Must include Header: 
+    - short sentence of the video
+    - Films: must include name of the film
+    - Sports: must include name of the sports venue
+- Must include Description: 
+    - description less than 200 word
+    - Film: must include cast and their roles
+    - Sports: must include teams and athletes
+- Must include Video Type: classify "Film" or "Sports"
+- Must include Location: City name
+- Must include: Name of the event
+
+### 2. Technical Requirements
+- Must include Resolution: any resolution 
+- Must include frame rate
+- Must include encoding
+- Leave blank if data unavailable
+
+### 3. OUTPUT SCHEMA
+```json
+{
+    "header": "[short description of the video]",
+    "description": "[content summary about 200 words]",
+    "video_type": "[Film or Sports]",
+    "location": "[city]",
+    "venue": "[venue name]",
+    "technical_specs": {
+        "resolution": "1280x720",
+        "frame_rate": "30",
+        "encoding": "h264",
+    }
+}
+```
