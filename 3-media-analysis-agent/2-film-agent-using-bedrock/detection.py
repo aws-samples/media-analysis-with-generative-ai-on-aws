@@ -17,7 +17,7 @@ def get_named_parameter(event, name):
         return next(item for item in event['parameters'] if item['name'] == name)['value']
     except StopIteration:
         raise ValueError(f"Required parameter '{name}' not found in event")
-        
+
 def get_cast_member(cast_id):
     try:
         table = dynamodb_resource.Table(cast_table)
@@ -51,18 +51,18 @@ def extract_bucket_key(video_s3_path):
 
 def detect_key_figures(video_s3_path):
     bucket, key = extract_bucket_key(video_s3_path)
-    
+
     job_id = start_celebrity_detection(bucket, key)
     print(f"Started celebrity detection job: {job_id}")
 
     while True:
         response = get_celebrity_detection_results(job_id)
         status = response['JobStatus']
-        
+
         if status in ['SUCCEEDED', 'FAILED']:
             print("JOB COMPLETE....")
             break
-        
+
         print("Job in progress...")
         time.sleep(10)
 
@@ -71,11 +71,11 @@ def detect_key_figures(video_s3_path):
     if status == 'SUCCEEDED':
         for celebrity in response['Celebrities']:
             celeb = celebrity['Celebrity']
-            
+
             # Only process celebrities with 95%+ confidence
             if celeb['Confidence'] >= 95.0:
                 celeb_id = celeb['Id']
-                
+
                 # Store or update celebrity info only if not already stored
                 if celeb_id not in unique_celebrities:
                     celebrity_info = {
@@ -84,7 +84,7 @@ def detect_key_figures(video_s3_path):
                         'id': celeb_id,
                         'first_appearance': celebrity['Timestamp']
                     }
-                    
+
                     # If you have additional celebrity info in DynamoDB
                     try:
                         query_items = get_cast_member(celeb_id)
@@ -92,7 +92,7 @@ def detect_key_figures(video_s3_path):
                             celebrity_info.update(query_items[0])
                     except Exception as e:
                         print(f"Error fetching additional celebrity info: {str(e)}")
-                    
+
                     unique_celebrities[celeb_id] = celebrity_info
     else:
         print("Detection failed....")
@@ -115,10 +115,10 @@ def populate_function_response(event, response_body):
             }
         }
     }
-    
+
 def lambda_handler(event, context):
     print(event)
-    
+
     function = event.get('function', '')
     parameters = event.get('parameters', [])
     video_s3_path = get_named_parameter(event, "video_s3_path")
