@@ -15,7 +15,9 @@ botocore
 pyyaml
 retrying
 mcp==1.8.0
-openinference-semantic-conventions
+openinference-semantic-conventions==0.1.17
 opentelemetry-exporter-otlp-proto-http==1.33.0
 pydantic==2.10.2
 rich==13.9.4
+strands-agents==0.1.1
+strands-agents-tools==0.1.0
