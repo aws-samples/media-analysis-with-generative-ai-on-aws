@@ -16,5 +16,9 @@ shots/
 **/*.json
 !/fastpath/Netflix_Open_Content_Meridian/*.json
 !/fastpath/Sintel2010-720p/*.json
+!/3-media-analysis-agent/2-film-agent-using-bedrock/films/*.json
+!/3-media-analysis-agent/2-film-agent-using-bedrock/*.json
+!/3-media-analysis-agent/5-media-operations-multiagent-using-bedrock/standards/*.json
+!/3-media-analysis-agent/5-media-operations-multiagent-using-bedrock/*.json
 **/*.vtt
 */*.txt

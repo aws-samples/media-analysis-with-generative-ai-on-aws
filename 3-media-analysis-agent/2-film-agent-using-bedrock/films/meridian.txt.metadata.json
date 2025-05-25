@@ -1,0 +1,25 @@
+{
+    "metadataAttributes": {
+        "film_name": {
+            "value": {
+                "type": "STRING",
+                "stringValue": "Meridian"
+            },
+            "includeForEmbedding": false
+        },
+        "Year": {
+            "value": {
+                "type": "STRING",
+                "stringValue": "2016"
+            },
+            "includeForEmbedding": true
+        },
+        "Director": {
+            "value": {
+                "type": "STRING",
+                "stringValue": "Curtis Clark"
+            },
+            "includeForEmbedding": true
+        }
+    }
+}

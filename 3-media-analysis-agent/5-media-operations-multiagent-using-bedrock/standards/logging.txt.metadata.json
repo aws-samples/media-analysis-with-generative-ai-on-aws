@@ -1,0 +1,18 @@
+{
+    "metadataAttributes": {
+        "filename": {
+            "value": {
+                "type": "STRING",
+                "stringValue": "logging.txt"
+            },
+            "includeForEmbedding": false
+        },
+        "tag_type": {
+            "value": {
+                "type": "STRING",
+                "stringValue": "LOGGING"
+            },
+            "includeForEmbedding": true
+        }
+    }
+}
