@@ -1,4 +1,4 @@
-faiss-cpu==1.8.0
+faiss-cpu>=1.9.0
 ImageHash==4.3.1
 imageio-ffmpeg==0.5.1
 json-repair==0.44.1
@@ -10,6 +10,7 @@ webvtt-py==0.5.1
 termcolor==2.5.0
 black==24.10.0
 ipython==8.29.0
+pickleshare>=0.7.5
 boto3==1.38.13
 botocore
 pyyaml

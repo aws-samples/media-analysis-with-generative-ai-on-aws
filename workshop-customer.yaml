@@ -1,0 +1,279 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: |
+  Minimal resources for Video Understanding Workshop - Customer deployment
+  Creates S3 bucket, MediaConvert role, and OpenSearch Serverless collection
+
+Parameters:
+  UserOrRoleArn:
+    Type: String
+    Description: "ARN of the IAM user or role that needs access to OpenSearch (e.g., arn:aws:iam::123456789012:user/username or arn:aws:sts::123456789012:assumed-role/AmazonSageMaker-ExecutionRole/SageMaker). Leave empty to skip."
+    Default: ""
+
+Conditions:
+  HasUserOrRoleArn: !Not [!Equals [!Ref UserOrRoleArn, ""]]
+
+Resources:
+  WorkshopBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  MediaConvertRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-MediaConvertRole"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "mediaconvert.amazonaws.com"
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-MediaConvertPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt WorkshopBucket.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub "${WorkshopBucket.Arn}/*"
+
+  NotebookExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-NotebookExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - sagemaker.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-MediaConvertPassRole"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource:
+                  - !GetAtt MediaConvertRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: mediaconvert.amazonaws.com
+        - PolicyName: !Sub ${AWS::StackName}-s3
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource:
+                  - !GetAtt WorkshopBucket.Arn
+                  - !Sub "${WorkshopBucket.Arn}/*"
+        - PolicyName: !Sub ${AWS::StackName}-bedrock
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: "*"
+                Effect: Allow
+        - PolicyName: !Sub ${AWS::StackName}-aoss
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - aoss:APIAccessAll
+                Resource: !GetAtt VssCollection.Arn
+        - PolicyName: !Sub ${AWS::StackName}-mediaconvert
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - mediaconvert:*
+                Resource: "*"
+        - PolicyName: !Sub ${AWS::StackName}-rekognition
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - rekognition:*
+                Resource: "*"
+        - PolicyName: !Sub ${AWS::StackName}-transcribe
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - transcribe:*
+                Resource: "*"
+        - PolicyName: !Sub ${AWS::StackName}-cloudformation
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                Resource: !Ref AWS::StackId
+
+  VssSecurityPolicy:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: !Sub vss-${AWS::AccountId}
+      Type: encryption
+      Policy: !Sub |
+        {
+          "Rules": [
+            {
+              "Resource": [
+                "collection/vss-collection-${AWS::AccountId}"
+              ],
+              "ResourceType": "collection"
+            }
+          ],
+          "AWSOwnedKey": true
+        }
+
+  VssCollection:
+    Type: AWS::OpenSearchServerless::Collection
+    DependsOn: VssSecurityPolicy
+    Properties:
+      Name: !Sub vss-collection-${AWS::AccountId}
+      Type: VECTORSEARCH
+
+  VssNetworkPolicy:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: !Sub vss-${AWS::AccountId}
+      Description: public access for dashboard and collection endpoint
+      Type: network
+      Policy: !Sub |
+        [
+          {
+            "Description": "Public access for collection endpoint",
+            "Rules": [
+              {
+                "ResourceType": "collection",
+                "Resource": [
+                  "collection/vss-collection-${AWS::AccountId}"
+                ]
+              }
+            ],
+            "AllowFromPublic": true
+          },
+          {
+            "Description": "Public access for dashboards",
+            "Rules": [
+              {
+                "ResourceType": "dashboard",
+                "Resource": [
+                  "collection/vss-collection-${AWS::AccountId}"
+                ]
+              }
+            ],
+            "AllowFromPublic": true
+          }
+        ]
+
+  VssDataAccessPolicy:
+    Type: AWS::OpenSearchServerless::AccessPolicy
+    Properties:
+      Name: !Sub vss-policy-${AWS::AccountId}
+      Description: allow index and collection access
+      Type: data
+      Policy: !If
+        - HasUserOrRoleArn
+        - !Sub |
+            [
+              {
+                "Rules": [
+                  {
+                    "ResourceType": "index",
+                    "Resource": [
+                      "index/vss-collection-${AWS::AccountId}/*"
+                    ],
+                    "Permission": [
+                      "aoss:*"
+                    ]
+                  },
+                  {
+                    "ResourceType": "collection",
+                    "Resource": [
+                      "collection/vss-collection-${AWS::AccountId}"
+                    ],
+                    "Permission": [
+                      "aoss:*"
+                    ]
+                  }
+                ],
+                "Principal": [
+                  "${NotebookExecutionRole.Arn}",
+                  "${UserOrRoleArn}"
+                ]
+              }
+            ]
+        - !Sub |
+            [
+              {
+                "Rules": [
+                  {
+                    "ResourceType": "index",
+                    "Resource": [
+                      "index/vss-collection-${AWS::AccountId}/*"
+                    ],
+                    "Permission": [
+                      "aoss:*"
+                    ]
+                  },
+                  {
+                    "ResourceType": "collection",
+                    "Resource": [
+                      "collection/vss-collection-${AWS::AccountId}"
+                    ],
+                    "Permission": [
+                      "aoss:*"
+                    ]
+                  }
+                ],
+                "Principal": [
+                  "${NotebookExecutionRole.Arn}"
+                ]
+              }
+            ]
+
+Outputs:
+  S3BucketName:
+    Description: S3 bucket for workshop data
+    Value: !Ref WorkshopBucket
+  MediaConvertRole:
+    Description: IAM role for MediaConvert
+    Value: !GetAtt MediaConvertRole.Arn
+  AOSSCollectionEndpoint:
+    Description: OpenSearch Serverless collection endpoint
+    Value: !GetAtt VssCollection.CollectionEndpoint
+  NotebookExecutionRole:
+    Description: IAM role for notebook execution (use this as your SageMaker execution role)
+    Value: !GetAtt NotebookExecutionRole.Arn
