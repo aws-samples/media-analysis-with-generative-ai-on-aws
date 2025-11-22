@@ -1,0 +1,657 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Bedrock Knowledge Base with S3 Vector Store - Standalone Deployment'
+
+Parameters:
+  BaseName:
+    Type: String
+    Default: 'lu-agent'
+    Description: 'Base name for all resources'
+  
+  AudioVisualModelId:
+    Type: String
+    Default: 'global.anthropic.claude-sonnet-4-20250514-v1:0'
+    Description: 'Model ID for audio-visual processing and memory consolidation'
+
+Resources:
+  # IAM Role for Memory Execution (required for Custom strategies)
+  MemoryExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AgentCoreMemoryExecutionRole
+      Description: 'IAM role for Amazon Bedrock AgentCore Memory execution'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock-agentcore.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:*'
+      Policies:
+        - PolicyName: AgentCoreMemoryExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: BedrockModelInvocation
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - 'arn:aws:bedrock:*::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:*'
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock-agentcore/memory/*'
+
+  # Lambda function to wait for IAM role propagation
+  WaitForRolePropagationFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: 
+      - MemoryExecutionRole
+      - VectorStoreLambdaRole
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-wait-for-role'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt VectorStoreLambdaRole.Arn
+      Timeout: 30
+      Code:
+        ZipFile: |
+          import cfnresponse
+          import time
+          
+          def handler(event, context):
+              try:
+                  if event['RequestType'] == 'Delete':
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      return
+                  
+                  # Wait for IAM role propagation (10 seconds as per Python code)
+                  time.sleep(10)
+                  
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                      'Message': 'IAM role propagation wait completed'
+                  })
+              except Exception as e:
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {
+                      'Error': str(e)
+                  })
+
+  # Custom resource to trigger the wait
+  WaitForRolePropagation:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: WaitForRolePropagationFunction
+    Properties:
+      ServiceToken: !GetAtt WaitForRolePropagationFunction.Arn
+      RoleArn: !GetAtt MemoryExecutionRole.Arn
+
+  # Bedrock Agent Core Memory for Video Analysis
+  VideoAnalysisMemory:
+    Type: AWS::BedrockAgentCore::Memory
+    DependsOn: WaitForRolePropagation
+    Properties:
+      Name: video_analysis_memory
+      Description: 'Long-term memory for video analysis agents'
+      EventExpiryDuration: 7  # 7 days
+      MemoryExecutionRoleArn: !GetAtt MemoryExecutionRole.Arn
+      MemoryStrategies:
+        - CustomMemoryStrategy:
+            Name: rolling_summary
+            Namespaces:
+              - "summary/{actorId}/{sessionId}"
+            Configuration:
+              SummaryOverride:
+                Consolidation:
+                  AppendToPrompt: "Merge new info with existing summary. Keep previous info and add new. This is cumulative - grow, don't replace."
+                  ModelId: !Ref AudioVisualModelId
+    DeletionPolicy: Delete
+
+  # Bedrock Agent Core Memory for Live Transcription
+  LiveTranscriptionMemory:
+    Type: AWS::BedrockAgentCore::Memory
+    DependsOn: WaitForRolePropagation
+    Properties:
+      Name: live_transcript_memory
+      Description: 'Long-term memory for live transcription agents'
+      EventExpiryDuration: 7  # 7 days
+      MemoryExecutionRoleArn: !GetAtt MemoryExecutionRole.Arn
+      MemoryStrategies:
+        - CustomMemoryStrategy:
+            Name: rolling_summary
+            Namespaces:
+              - "summary/{actorId}/{sessionId}"
+            Configuration:
+              SummaryOverride:
+                Consolidation:
+                  AppendToPrompt: "Merge new info with existing summary. Keep previous info and add new. This is cumulative - grow, don't replace."
+                  ModelId: !Ref AudioVisualModelId
+    DeletionPolicy: Delete
+
+  # Bedrock Agent Core Memory for Chapter Analysis
+  ChapterMemory:
+    Type: AWS::BedrockAgentCore::Memory
+    DependsOn: WaitForRolePropagation
+    Properties:
+      Name: chapter_memory
+      Description: 'Long-term memory for chapter analysis agents'
+      EventExpiryDuration: 7  # 7 days
+      MemoryExecutionRoleArn: !GetAtt MemoryExecutionRole.Arn
+      MemoryStrategies:
+        - CustomMemoryStrategy:
+            Name: rolling_summary
+            Namespaces:
+              - "summary/{actorId}/{sessionId}"
+            Configuration:
+              SummaryOverride:
+                Consolidation:
+                  AppendToPrompt: "Merge new info with existing summary. Keep previous info and add new. This is cumulative - grow, don't replace."
+                  ModelId: !Ref AudioVisualModelId
+    DeletionPolicy: Delete
+
+  # S3 Data Bucket for Knowledge Base content
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BaseName}-data-${AWS::AccountId}-${AWS::Region}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+
+  # IAM Role for Knowledge Base
+  KnowledgeBaseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'AmazonBedrockExecutionRoleForKB-${BaseName}-${AWS::AccountId}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BedrockKBPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket]
+                Resource: 
+                  - !GetAtt DataBucket.Arn
+                  - !Sub '${DataBucket.Arn}/*'
+              - Effect: Allow
+                Action: bedrock:InvokeModel
+                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${BaseName}-vector-${AWS::AccountId}'
+                  - !Sub 'arn:aws:s3:::${BaseName}-vector-${AWS::AccountId}/*'
+              - Effect: Allow
+                Action:
+                  - s3vectors:*
+                Resource:
+                  - !Sub 'arn:aws:s3vectors:${AWS::Region}:${AWS::AccountId}:bucket/${BaseName}-vector-${AWS::AccountId}'
+                  - !Sub 'arn:aws:s3vectors:${AWS::Region}:${AWS::AccountId}:bucket/${BaseName}-vector-${AWS::AccountId}/*'
+
+  # Lambda Role for Vector Store Management
+  VectorStoreLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-VectorStoreLambdaRole'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  VectorStoreLambdaPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:CreateBucket
+              - s3:DeleteBucket
+              - s3:ListBucket
+              - s3:HeadBucket
+            Resource: !Sub 'arn:aws:s3:::${BaseName}-vector-${AWS::AccountId}'
+          - Effect: Allow
+            Action:
+              - s3vectors:CreateVectorBucket
+              - s3vectors:DeleteVectorBucket
+              - s3vectors:ListVectorBuckets
+              - s3vectors:CreateIndex
+              - s3vectors:PutVectors
+              - s3vectors:ListVectors
+              - s3vectors:DeleteVectors
+              - s3vectors:ListIndexes
+              - s3vectors:DeleteIndex
+              - s3vectors:QueryVectors
+            Resource:
+              - !Sub 'arn:aws:s3vectors:${AWS::Region}:${AWS::AccountId}:bucket/${BaseName}-vector-${AWS::AccountId}'
+              - !Sub 'arn:aws:s3vectors:${AWS::Region}:${AWS::AccountId}:bucket/${BaseName}-vector-${AWS::AccountId}/*'
+          - Effect: Allow
+            Action:
+              - xray:PutTraceSegments
+              - xray:PutTelemetryRecords
+            Resource: "*"
+      Roles:
+        - !Ref VectorStoreLambdaRole
+
+  # Lambda Function to Create S3 Vector Bucket
+  VectorStoreLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: 
+      - VectorStoreLambdaPolicy
+      - VectorStoreLambdaRole
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-vector-store'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt VectorStoreLambdaRole.Arn
+      Timeout: 900
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          
+          def handler(event, context):
+              try:
+                  import traceback
+                  s3vectors = boto3.client('s3vectors')
+                  bucket_name = event['ResourceProperties']['BucketName']
+                  
+                  print(f"Event: {json.dumps(event)}")
+                  print(f"Request Type: {event['RequestType']}")
+                  
+                  if event['RequestType'] == 'Create':
+                      print(f"Creating S3 Vector bucket: {bucket_name}")
+                      response = s3vectors.create_vector_bucket(vectorBucketName=bucket_name)
+                      print(f"Create response: {response}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {'BucketName': bucket_name})
+                      
+                  elif event['RequestType'] == 'Delete':
+                      print(f"Deleting S3 Vector bucket: {bucket_name}")
+                      try:
+                          # List and delete all indexes first
+                          indexes = s3vectors.list_indexes(vectorBucketName=bucket_name)
+                          for index in indexes.get('indexes', []):
+                              s3vectors.delete_index(vectorBucketName=bucket_name, indexName=index['indexName'])
+                          # Delete the bucket
+                          s3vectors.delete_vector_bucket(vectorBucketName=bucket_name)
+                      except Exception as e:
+                          print(f"Error during deletion: {e}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      
+                  else:  # Update
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {'BucketName': bucket_name})
+                      
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  traceback.print_exc()
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  # Custom Resource for S3 Vector Bucket
+  VectorStoreBucket:
+    Type: Custom::VectorStoreBucket
+    DeletionPolicy: Retain
+    DependsOn: VectorStoreLambda
+    Properties:
+      ServiceToken: !GetAtt VectorStoreLambda.Arn
+      BucketName: !Sub '${BaseName}-vector-${AWS::AccountId}'
+
+  # Lambda Function to Create Index
+  CreateIndexLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: [VectorStoreLambdaPolicy, VectorStoreLambdaRole]
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-create-index'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt VectorStoreLambdaRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          
+          def handler(event, context):
+              try:
+                  s3vectors = boto3.client('s3vectors')
+                  bucket_name = event['ResourceProperties']['BucketName']
+                  index_name = event['ResourceProperties']['IndexName']
+                  
+                  if event['RequestType'] == 'Create':
+                      print(f"Creating index {index_name} in bucket {bucket_name}")
+                      response = s3vectors.create_index(
+                          vectorBucketName=bucket_name,
+                          indexName=index_name,
+                          dataType='float32',
+                          dimension=1024,
+                          distanceMetric='cosine',
+                          metadataConfiguration={
+                              'nonFilterableMetadataKeys': ['AMAZON_BEDROCK_TEXT']
+                          }
+                      )
+                      
+                      # Get index ARN - try different response structures
+                      if 'indexArn' in response:
+                          index_arn = response['indexArn']
+                      elif 'index' in response and 'indexArn' in response['index']:
+                          index_arn = response['index']['indexArn']
+                      else:
+                          # Get it via list_indexes
+                          list_response = s3vectors.list_indexes(vectorBucketName=bucket_name)
+                          index_arn = list_response['indexes'][0]['indexArn']
+                      
+                      print(f"Index created with ARN: {index_arn}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'IndexName': index_name,
+                          'IndexArn': index_arn
+                      })
+                      
+                  elif event['RequestType'] == 'Delete':
+                      print(f"Deleting index {index_name} from bucket {bucket_name}")
+                      try:
+                          s3vectors.delete_index(vectorBucketName=bucket_name, indexName=index_name)
+                      except Exception as e:
+                          print(f"Error during deletion: {e}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      
+                  else:  # Update
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {'IndexName': index_name})
+                      
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  # Custom Resource for Index Creation
+  CreateIndexResource:
+    Type: AWS::CloudFormation::CustomResource
+    DeletionPolicy: Retain
+    DependsOn: VectorStoreBucket
+    Properties:
+      ServiceToken: !GetAtt CreateIndexLambda.Arn
+      BucketName: !Sub '${BaseName}-vector-${AWS::AccountId}'
+      IndexName: lu-index
+
+  # Lambda Role for Knowledge Base Creation
+  KnowledgeBaseLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-KnowledgeBaseLambdaRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockKnowledgeBaseManagement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:CreateKnowledgeBase
+                  - bedrock:DeleteKnowledgeBase
+                  - bedrock:GetKnowledgeBase
+                  - bedrock:UpdateKnowledgeBase
+                  - bedrock:TagResource
+                  - bedrock:UntagResource
+                  - bedrock:CreateDataSource
+                  - bedrock:DeleteDataSource
+                  - bedrock:GetDataSource
+                  - bedrock:UpdateDataSource
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: !GetAtt KnowledgeBaseRole.Arn
+
+  # Lambda Function to Create Knowledge Base with S3 Vector
+  CreateKnowledgeBaseLambda:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - KnowledgeBaseLambdaRole
+      - KnowledgeBaseRole
+      - VectorStoreLambda
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-create-kb'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt KnowledgeBaseLambdaRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          
+          def handler(event, context):
+              try:
+                  bedrock = boto3.client('bedrock-agent')
+                  
+                  kb_name = event['ResourceProperties']['Name']
+                  description = event['ResourceProperties']['Description']
+                  role_arn = event['ResourceProperties']['RoleArn']
+                  embedding_model_arn = event['ResourceProperties']['EmbeddingModelArn']
+                  index_arn = event['ResourceProperties']['IndexArn']
+                  
+                  if event['RequestType'] == 'Create':
+                      print(f"Creating Knowledge Base: {kb_name}")
+                      print(f"Using index ARN: {index_arn}")
+                      response = bedrock.create_knowledge_base(
+                          name=kb_name,
+                          description=description,
+                          roleArn=role_arn,
+                          knowledgeBaseConfiguration={
+                              'type': 'VECTOR',
+                              'vectorKnowledgeBaseConfiguration': {
+                                  'embeddingModelArn': embedding_model_arn,
+                                  'embeddingModelConfiguration': {
+                                      'bedrockEmbeddingModelConfiguration': {
+                                          'dimensions': 1024
+                                      }
+                                  }
+                              }
+                          },
+                          storageConfiguration={
+                              'type': 'S3_VECTORS',
+                              's3VectorsConfiguration': {
+                                  'indexArn': index_arn
+                              }
+                          }
+                      )
+                      
+                      kb_id = response['knowledgeBase']['knowledgeBaseId']
+                      kb_arn = response['knowledgeBase']['knowledgeBaseArn']
+                      
+                      print(f"Knowledge Base created: {kb_id}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'KnowledgeBaseId': kb_id,
+                          'KnowledgeBaseArn': kb_arn
+                      }, physicalResourceId=kb_id)
+                      
+                  elif event['RequestType'] == 'Delete':
+                      kb_id = event['PhysicalResourceId']
+                      print(f"Deleting Knowledge Base: {kb_id}")
+                      try:
+                          bedrock.delete_knowledge_base(knowledgeBaseId=kb_id)
+                      except Exception as e:
+                          print(f"Error during deletion: {e}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      
+                  else:  # Update
+                      kb_id = event['PhysicalResourceId']
+                      print(f"Updating Knowledge Base: {kb_id}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'KnowledgeBaseId': kb_id
+                      }, physicalResourceId=kb_id)
+                      
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  import traceback
+                  traceback.print_exc()
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  # Custom Resource for Knowledge Base
+  KnowledgeBase:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: CreateIndexResource
+    Properties:
+      ServiceToken: !GetAtt CreateKnowledgeBaseLambda.Arn
+      Name: !Sub '${BaseName}-kb-${AWS::AccountId}'
+      Description: !Sub 'Knowledge Base for ${BaseName}'
+      RoleArn: !GetAtt KnowledgeBaseRole.Arn
+      EmbeddingModelArn: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0'
+      IndexArn: !GetAtt CreateIndexResource.IndexArn
+
+  # Lambda Function to Create Data Source
+  CreateDataSourceLambda:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - KnowledgeBaseLambdaRole
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-create-datasource'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt KnowledgeBaseLambdaRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          
+          def handler(event, context):
+              try:
+                  bedrock = boto3.client('bedrock-agent')
+                  
+                  kb_id = event['ResourceProperties']['KnowledgeBaseId']
+                  ds_name = event['ResourceProperties']['Name']
+                  description = event['ResourceProperties']['Description']
+                  
+                  if event['RequestType'] == 'Create':
+                      print(f"Creating Data Source: {ds_name} for KB: {kb_id}")
+                      response = bedrock.create_data_source(
+                          knowledgeBaseId=kb_id,
+                          name=ds_name,
+                          description=description,
+                          dataSourceConfiguration={
+                              'type': 'CUSTOM'
+                          }
+                      )
+                      
+                      ds_id = response['dataSource']['dataSourceId']
+                      print(f"Data Source created: {ds_id}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'DataSourceId': ds_id
+                      }, physicalResourceId=ds_id)
+                      
+                  elif event['RequestType'] == 'Delete':
+                      ds_id = event['PhysicalResourceId']
+                      print(f"Deleting Data Source: {ds_id}")
+                      try:
+                          bedrock.delete_data_source(
+                              knowledgeBaseId=kb_id,
+                              dataSourceId=ds_id
+                          )
+                      except Exception as e:
+                          print(f"Error during deletion: {e}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      
+                  else:  # Update
+                      ds_id = event['PhysicalResourceId']
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'DataSourceId': ds_id
+                      }, physicalResourceId=ds_id)
+                      
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  import traceback
+                  traceback.print_exc()
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  # Custom Resource for Data Source
+  DataSource:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: KnowledgeBase
+    Properties:
+      ServiceToken: !GetAtt CreateDataSourceLambda.Arn
+      KnowledgeBaseId: !GetAtt KnowledgeBase.KnowledgeBaseId
+      Name: !Sub '${BaseName}-datasource-${AWS::AccountId}'
+      Description: !Sub 'Data source for ${BaseName}'
+
+Outputs:
+  KnowledgeBaseId:
+    Value: !GetAtt KnowledgeBase.KnowledgeBaseId
+    Description: Bedrock Knowledge Base ID
+    Export:
+      Name: !Sub '${AWS::StackName}-KnowledgeBaseId'
+  
+  DataSourceID:
+    Value: !GetAtt DataSource.DataSourceId
+    Description: Bedrock Data Source ID
+    Export:
+      Name: !Sub '${AWS::StackName}-DataSourceId'
+  
+  DataBucketName:
+    Value: !Ref DataBucket
+    Description: S3 bucket for Knowledge Base content
+    Export:
+      Name: !Sub '${AWS::StackName}-DataBucketName'
+  
+  KnowledgeBaseArn:
+    Value: !GetAtt KnowledgeBase.KnowledgeBaseArn
+    Description: Bedrock Knowledge Base ARN
+  
+  VectorBucketName:
+    Value: !Ref VectorStoreBucket
+    Description: S3 Vector bucket for Knowledge Base storage
+  
+  VideoAnalysisMemoryId:
+    Value: !GetAtt VideoAnalysisMemory.MemoryId
+    Description: Bedrock Agent Core Memory ID for Video Analysis
+  
+  LiveTranscriptionMemoryId:
+    Value: !GetAtt LiveTranscriptionMemory.MemoryId
+    Description: Bedrock Agent Core Memory ID for Live Transcription
+
+  ChapterMemoryId:
+    Value: !GetAtt ChapterMemory.MemoryId
+    Description: Bedrock Agent Core Memory ID for Chapter Analysis

@@ -1,0 +1,40 @@
+default_agent: live_streaming_companion_agent
+agents:
+  live_streaming_companion_agent:
+    name: live_streaming_companion_agent
+    entrypoint: /home/sagemaker-user/media-analysis-with-generative-ai-on-aws/4-live-media-analysis-agent/4-Live_viewing_companion/script/viewing_companion_agent.py
+    platform: linux/arm64
+    container_runtime: none
+    source_path: null
+    aws:
+      execution_role: arn:aws:iam::714233050498:role/live_streaming_companion_agent_role
+      execution_role_auto_create: false
+      account: '714233050498'
+      region: us-west-2
+      ecr_repository: 714233050498.dkr.ecr.us-west-2.amazonaws.com/bedrock-agentcore-live_streaming_companion_agent
+      ecr_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+    bedrock_agentcore:
+      agent_id: live_streaming_companion_agent-K6twN5FyEg
+      agent_arn: arn:aws:bedrock-agentcore:us-west-2:714233050498:runtime/live_streaming_companion_agent-K6twN5FyEg
+      agent_session_id: null
+    codebuild:
+      project_name: bedrock-agentcore-live_streaming_companion_agent-builder
+      execution_role: arn:aws:iam::714233050498:role/AmazonBedrockAgentCoreSDKCodeBuild-us-west-2-2435a1b638
+      source_bucket: bedrock-agentcore-codebuild-sources-714233050498-us-west-2
+    memory:
+      mode: STM_ONLY
+      memory_id: live_streaming_companion_agent_mem-PiF3jSDHaV
+      memory_arn: arn:aws:bedrock-agentcore:us-west-2:714233050498:memory/live_streaming_companion_agent_mem-PiF3jSDHaV
+      memory_name: live_streaming_companion_agent_mem
+      event_expiry_days: 30
+      first_invoke_memory_check_done: false
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null
