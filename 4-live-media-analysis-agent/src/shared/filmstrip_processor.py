@@ -92,7 +92,7 @@ class FilmstripProcessor:
         try:
             self.label_font = ImageFont.truetype(
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 
-                52
+                24
             )
         except:
             self.label_font = ImageFont.load_default()
@@ -477,7 +477,7 @@ class AdaptiveFilmstripProcessor:
         try:
             self.label_font = ImageFont.truetype(
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 
-                36
+                24
             )
         except:
             self.label_font = ImageFont.load_default()

@@ -69,6 +69,9 @@ class ProcessingUtils:
             start_time = time.time()
             last_refresh_time = time.time()
             
+            # Refresh table immediately on first load
+            refresh_chapter_table()
+            
             while True:
                 # Check duration timeout
                 if time.time() - start_time >= duration_minutes * 60:
@@ -80,8 +83,8 @@ class ProcessingUtils:
                     log_component("Main", "📡 Stream appears to have ended (60s timeout), stopping processors...")
                     break
                 
-                # Refresh display every 3 seconds
-                if time.time() - last_refresh_time >= 3:
+                # Refresh display every 15 seconds
+                if time.time() - last_refresh_time >= 15:
                     refresh_chapter_table()
                     last_refresh_time = time.time()
                     

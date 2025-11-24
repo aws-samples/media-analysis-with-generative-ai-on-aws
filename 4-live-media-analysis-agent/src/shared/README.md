@@ -1,6 +1,23 @@
 # Shared Components
 
-This directory contains reusable components shared across all video understanding modules.
+This directory contains reusable components shared across all video understanding modules for building live video understanding solutions using Agentic AI on AWS.
+
+## Workshop Overview
+
+This workshop demonstrates how to build a streaming companion agent that provides viewers with real-time interactive assistance during live streamed shows. The agent offers immediate context about current events, generates ongoing summaries, and enables quick access to key moments within the stream.
+
+![Use Case](../../static/introduction/usecase.png)
+
+The workshop is structured in two parts:
+1. **Live Video Understanding**: Implement solutions using AWS services and Amazon Bedrock foundation models to process visual, audio, and multi-modal content in real-time
+2. **Intelligent Agent Development**: Develop and deploy an agent using AWS Strands Agents and Amazon Bedrock AgentCore that leverages video understanding to interact with viewers
+
+## Key Technologies
+
+- **[Amazon Bedrock](https://aws.amazon.com/bedrock/)**: Flexible platform for building generative AI applications and agents
+- **[Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/)**: Agentic platform to build, deploy and operate agents securely at scale
+- **[AWS Strands Agents](https://strandsagents.com/latest/)**: Simple-to-use, code-first framework for building AI agents
+- **[Amazon Transcribe](https://aws.amazon.com/transcribe/)**: Fully managed, automatic speech recognition (ASR) service
 
 ## Components
 
@@ -100,6 +117,22 @@ Run the module directly to see example usage:
 ```bash
 python src/shared/shot_change_detector.py
 ```
+
+## Workshop Modules
+
+- **Module 1: Live Visual Understanding (30 minutes):** Analyze live video frames and detect shot changes using Amazon Bedrock with Nova Lite model for real-time visual understanding
+- **Module 2: Live Audio Understanding (30 minutes):** Convert speech to text using Amazon Transcribe and analyze content using Nova Lite model for comprehensive audio understanding
+- **Module 3: Live Multi-Modal Understanding (30 minutes):** Combine visual and audio insights using Claude Sonnet model to create contextual understanding of the live content
+- **Module 4: Live Streaming Companion Agent (30 minutes):** Build and deploy an interactive AWS Strands agent on Amazon Bedrock AgentCore with integrated memory systems
+
+## Key Learning Points
+
+By using these shared components, you will learn to:
+
+- **Live Video Processing:** Implement real-time video understanding solutions that address latency, incremental context, and resource optimization challenges
+- **Foundation Model Integration:** Leverage Amazon Bedrock models for visual analysis, audio processing, and multi-modal understanding of streaming content
+- **Agent Development:** Build an interactive agent using AWS Strands Agents that maintains video context and handles real-time viewer queries
+- **Production Deployment:** Deploy and optimize streaming agents on Amazon Bedrock AgentCore with efficient memory management and cost controls
 
 ## Version History
 

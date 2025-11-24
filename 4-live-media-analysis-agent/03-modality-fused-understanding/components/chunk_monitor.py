@@ -159,6 +159,21 @@ class ChunkMonitor:
                 
             log_component("ChunkMonitor", "🛑 Monitoring loop exited")
             
+            # Process any remaining chunks after stopping (same logic as ChunkProcessor)
+            log_component("ChunkMonitor", "🔍 Processing any remaining chunks...")
+            chunk_files = glob.glob(f"{self.output_dir}/chunks/chunk_*_{self.chunk_duration}s.mp4")
+            
+            for chunk_file in sorted(chunk_files):
+                chunk_match = re.search(r'chunk_(\d+)_', chunk_file)
+                if chunk_match:
+                    chunk_id = int(chunk_match.group(1))
+                    if chunk_id not in self.processed_chunks and os.path.exists(chunk_file):
+                        if self._verify_chunk_ready(chunk_file, is_final=True):
+                            log_component("ChunkMonitor", f"📁 Final chunk ready: {chunk_file}", "DEBUG")
+                            self._process_chunk(chunk_file, chunk_id)
+                            self.processed_chunks.add(chunk_id)
+                            self.chunk_count = max(self.chunk_count, chunk_id + 1)
+            
         except Exception as e:
             log_component("ChunkMonitor", f"❌ Monitoring error: {e}", "ERROR")
             import traceback
@@ -203,12 +218,23 @@ class ChunkMonitor:
             
             if is_final:
                 # For final chunks, accept any reasonable duration (minimum 1 second)
-                return duration >= 1.0
+                if duration >= 1.0:
+                    log_component("ChunkMonitor", f"✅ Final chunk ready: duration {duration:.1f}s", "DEBUG")
+                    return True
+                else:
+                    log_component("ChunkMonitor", f"⏳ Final chunk too short: {duration:.1f}s", "DEBUG")
+                    return False
             else:
                 # For regular chunks, check if duration matches expected
                 expected_duration = self.chunk_duration
                 duration_diff = abs(duration - expected_duration)
-                return duration_diff <= 1.0  # Allow 1 second tolerance
+                
+                if duration_diff <= 1.0:  # Allow 1 second tolerance
+                    log_component("ChunkMonitor", f"✅ Chunk ready: duration {duration:.1f}s (expected {expected_duration}s)", "DEBUG")
+                    return True
+                else:
+                    log_component("ChunkMonitor", f"⏳ Chunk duration {duration:.1f}s, waiting for {expected_duration}s", "DEBUG")
+                    return False
         
         except Exception as e:
             log_component("ChunkMonitor", f"⚠️ Error verifying chunk: {e}", "WARNING")
