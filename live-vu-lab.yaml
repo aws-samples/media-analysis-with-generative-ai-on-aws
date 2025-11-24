@@ -9,7 +9,7 @@ Parameters:
   
   AudioVisualModelId:
     Type: String
-    Default: 'global.anthropic.claude-sonnet-4-20250514-v1:0'
+    Default: 'us.amazon.nova-pro-v1:0'
     Description: 'Model ID for audio-visual processing and memory consolidation'
 
 Resources:
