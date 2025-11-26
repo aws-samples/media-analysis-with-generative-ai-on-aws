@@ -1,24 +1,62 @@
-faiss-cpu>=1.9.0
-ImageHash==4.3.1
-imageio-ffmpeg==0.5.1
-json-repair==0.44.1
+# AWS SDK and services
+boto3==1.40.65
+botocore==1.40.65
+amazon-transcribe==0.6.4
+
+# AWS Agentic AI
+strands-agents>=1.16.0
+strands-agents-tools==0.2.14
+bedrock-agentcore==1.0.5
+bedrock-agentcore-starter-toolkit==0.1.22
+
+# Async and networking
+asyncio-mqtt
+websockets
+requests
+
+# Data processing
+numpy
+pandas
 matplotlib==3.9.2
-moviepy==1.0.3
-opencv-python-headless==4.10.0.84
-opensearch-py==2.7.1
-webvtt-py==0.5.1
-termcolor==2.5.0
-black==24.10.0
+
+# Jupyter and notebook support
+jupyter
+ipykernel
+ipywidgets
 ipython==8.29.0
 pickleshare>=0.7.5
-boto3==1.38.13
-botocore
-pyyaml
-retrying
-mcp==1.8.0
+
+# Video and image processing
+opencv-python
+opencv-python-headless==4.10.0.84
+Pillow
+ImageHash==4.3.1
+moviepy==1.0.3
+imageio-ffmpeg==0.5.1
+webvtt-py==0.5.1
+
+# Audio processing
+librosa
+scipy
+soundfile
+audioread
+ffmpeg-python
+
+# Search and indexing
+faiss-cpu>=1.9.0
+opensearch-py==2.7.1
+
+# MCP and observability
+mcp
 openinference-semantic-conventions==0.1.17
 opentelemetry-exporter-otlp-proto-http==1.33.0
+
+# Utilities
+python-dotenv
+json-repair==0.44.1
+termcolor==2.5.0
+black==24.10.0
+pyyaml
+retrying
 pydantic
 rich
-strands-agents==0.1.1
-strands-agents-tools==0.1.0
