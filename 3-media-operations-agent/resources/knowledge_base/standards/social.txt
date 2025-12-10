@@ -1,0 +1,75 @@
+# Video Content Compliance Standards for Social Media
+**Document Number:** SOC-MED-001  
+**Last Updated:** March 2025  
+**Department:** Content Operations
+
+## 1. CONTENT TYPE REQUIREMENTS
+
+### 1.1 News Content
+- **Required Elements (5W's):**
+  - Who: Key individuals/organizations involved
+  - What: Main event/incident description
+  - Where: Specific location
+  - When: Date and time
+  - Why: Context of the event
+
+### 1.2 Film Content
+- **Required Elements:**
+  - Movie title with release year
+  - Main cast members with @mentions
+  - Character names
+
+### 1.3 Sports Content
+- **Required Elements:**
+  - Event/Game name
+  - Venue information
+  - Team names with @handles
+  - Key players mentioned
+
+## 2. DISTRIBUTION CHANNEL REQUIREMENTS
+- Description: Maximum 75 words
+- Hashtags: 2-3 relevant tags required
+- Mentions: Include applicable @handles
+- Tone: Casual and engaging
+- Emoji: Strategic placement for engagement
+- Structure: Hook, Main Point, Call-to-action
+
+## 3. DATA MODELS
+```json
+{
+    "description": "[Insert Social Media Copy]"
+}
+```
+
+### 3.1 News Content Example:
+```json
+{
+    "description": "🚀 Breaking Tech News: Game-changing AI unveiled in Silicon Valley! @ABCTech CEO Jane Smith reveals 'InnovAI' system showing 300% improvement over existing solutions. Watch the full demo that's got tech leaders buzzing! #TechInnovation #AI"
+}
+```
+
+### 3.2 Film Content Example:
+```json
+{
+    "description": "🎬 Experience the epic space saga that's breaking box office records! Watch Timothée Chalamet (@tchalamet) lead House Atreides as Paul in #Dune, with Rebecca Ferguson as Lady Jessica and @Zendaya as Chani. Don't miss the year's biggest sci-fi adventure - now in theaters! #DuneMovie"
+}
+```
+
+### 3.3 Sports Content Example:
+```json
+{
+    "description": "⚽️ GOAL OF THE YEAR ALERT! @ErlingHaaland's stunning bicycle kick sends @ManCity to the top! Watch this incredible moment from the Etihad Stadium that has everyone talking. Catch the full highlights now! #PremierLeague #MCFC"
+}
+```
+
+## 4. COMPLIANCE CHECKLIST
+- [ ] Description within 75-word limit
+- [ ] Three-part structure (Hook, Main Point, Call-to-action)
+- [ ] Content type specific elements included
+- [ ] 2-3 relevant hashtags added
+- [ ] Appropriate @mentions included
+- [ ] Strategic emoji placement
+- [ ] Casual, engaging tone maintained
+- [ ] Platform-specific requirements met
+
+**End of Video Content Compliance Standards for Social Media**

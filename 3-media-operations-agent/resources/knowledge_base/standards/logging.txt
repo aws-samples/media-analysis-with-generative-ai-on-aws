@@ -1,0 +1,134 @@
+# Video Content Compliance Standards for Internal Video Logging
+**Document Number:** LOG-VID-001  
+**Last Updated:** March 2025  
+**Department:** Content Operations
+
+## 1. CONTENT TYPE REQUIREMENTS
+
+### 1.1 News Content
+- **Header Requirements:**
+  - Short headline of news event
+  - Key organization/individual involved
+  - Date of event
+- **Description Requirements:**
+  - Maximum 200 words
+  - Include 5W's (Who, What, Where, When, Why)
+  - Event significance and impact
+  - Source attribution
+
+### 1.2 Film Content
+- **Header Requirements:**
+  - Film title and release year
+  - Production company
+  - Content type identifier
+- **Description Requirements:**
+  - Maximum 200 words
+  - Cast members and roles
+  - Director and key crew
+  - Plot synopsis
+  - Production details
+
+### 1.3 Sports Content
+- **Header Requirements:**
+  - Event name
+  - Teams/Athletes involved
+  - Venue name
+- **Description Requirements:**
+  - Maximum 200 words
+  - Match/Game details
+  - Key highlights
+  - Final outcome
+  - Significant statistics
+
+## 2. DISTRIBUTION CHANNEL REQUIREMENTS
+- Title: Maximum 120 characters
+- Description: Maximum 200 words
+- Minimum 3 tags required
+- Voice: Professional and informative
+- All titles must use title case
+- Video Type: News, Film, or Sports classification
+- Location: City and country
+- Venue: Specific location name
+- Resolution: Available quality options
+- Frame Rate: Captured speed
+- Encoding: Format specification
+- Missing data fields marked as "N/A"
+
+## 3. DATA MODELS
+```json
+{
+    "header": "[short description of the video]",
+    "description": "[content summary about 200 words]",
+    "video_type": "[Film or Sports]",
+    "location": "[city]",
+    "venue": "[venue name]",
+    "tags": [“relevant”, “tags”, “3 minimum”],
+    "technical_specs": {
+        "resolution": "1280x720",
+        "frame_rate": "30",
+        "encoding": "h264",
+    }
+}
+```
+
+### 3.1 News Content Example:
+```json
+{
+    “title”: "Tech Giant ABC Technologies Unveils Revolutionary AI Platform",
+    "description": "Industry leader ABC Technologies revealed their groundbreaking AI platform 'InnovAI' at their headquarters. CEO Jane Smith demonstrated the system's capabilities to industry leaders and media representatives. The presentation showcased unprecedented improvements in natural language processing and real-time decision making, with testing results indicating a 300% improvement over existing solutions. The event marks a significant milestone in artificial intelligence development and positions ABC Technologies at the forefront of AI innovation.",
+    "video_type": "News",
+    "location": "Palo Alto, USA",
+    "venue": "ABC Technologies HQ",
+    "tags": [“News”, “AI”, “Tech Giant”],
+    "technical_specs": {
+        "resolution": "3840x2160",
+        "frame_rate": "60",
+        "encoding": "h264"
+    }
+}
+```
+
+### 3.2 Film Content Example:
+```json
+{
+    "title": "Dune: Behind the Scenes Feature",
+    "description": "Exclusive behind-the-scenes footage from Denis Villeneuve's epic sci-fi adaptation. Features Timothée Chalamet as Paul Atreides, discussing character development and training sequences. Rebecca Ferguson and Zendaya share insights about their roles as Lady Jessica and Chani respectively. Includes detailed footage of practical effects creation, costume design, and cinematography techniques used to bring Arrakis to life.",
+    "video_type": "Film",
+    "location": "Budapest, Hungary",
+    "venue": "Origo Studios",
+    "tags": [“Film”, “Sci-Fi”, “Training”],
+    "technical_specs": {
+        "resolution": "4096x2160",
+        "frame_rate": "24",
+        "encoding": "ProRes 422"
+    }
+}
+```
+
+### 3.3 Sports Content Example:
+```json
+{
+    "title": "Super Bowl LVIII: Chiefs vs 49ers Championship Game",
+    "description": "Complete game footage of Super Bowl LVIII featuring the Kansas City Chiefs against the San Francisco 49ers. Includes pre-game ceremonies, full match coverage, and post-game celebrations. Key highlights feature Patrick Mahomes' game-winning drive and crucial defensive plays by both teams. Coverage includes sideline reactions, coach communications, and multiple angle replays of scoring plays.",
+    "video_type": "Sports",
+    "location": "Las Vegas, USA",
+    "venue": "Allegiant Stadium",
+    "tags": [“Football”, “Chiefs”, “49ers”, “championship”],
+    "technical_specs": {
+        "resolution": "3840x2160",
+        "frame_rate": "60",
+        "encoding": "h264"
+    }
+}
+```
+
+## 4. COMPLIANCE CHECKLIST
+- [ ] Header includes all required elements
+- [ ] Description within 200-word limit
+- [ ] Content type correctly classified
+- [ ] Location and venue properly documented or marked N/A
+- [ ] Technical specifications completed or marked N/A
+- [ ] All required content type elements included
+- [ ] File naming convention followed
+
+**End of Video Content Compliance Standards for Internal Video Logging**
