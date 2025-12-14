@@ -1,0 +1,43 @@
+[
+    {
+        "name": "retrieve_match_info",
+        "description": "Retrieve related match report that may have additional team and player info from sports knowledge base using video metadata",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query describing the game or video content"
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return (default: 1)"
+                }
+            },
+            "required": [
+                "query"
+            ]
+        }
+    },
+    {
+        "name": "lookup_player_info",
+        "description": "Look up detailed player information (name, position, height, weight) from the player database. Requires the exact team name from match reports and the player's jersey number from the video.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "team_name": {
+                    "type": "string",
+                    "description": "Exact team name with proper capitalization (e.g., 'Alpine Wolves', 'Metropolitan Knights')"
+                },
+                "player_number": {
+                    "type": "string",
+                    "description": "Player's jersey number (e.g., '14', '8', '17')"
+                }
+            },
+            "required": [
+                "team_name",
+                "player_number"
+            ]
+        }
+    }
+]

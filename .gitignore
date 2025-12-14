@@ -18,6 +18,7 @@ shots/
 
 !/fastpath/Sintel2010-720p/*.json
 !/3-media-operations-agent/resources/lambda/*.json
+!/3-media-operations-agent/2-sports-agent-with-gateway/lambda/*.json
 3-media-operations-agent/4-multi-agent-for-sports-analysis/helper
 **/Dockerfile
 **/*.vtt
