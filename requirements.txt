@@ -48,7 +48,7 @@ faiss-cpu>=1.9.0
 opensearch-py==2.7.1
 
 # MCP and observability
-mcp==1.18.0
+mcp==1.23.0
 openinference-semantic-conventions==0.1.17
 opentelemetry-exporter-otlp-proto-http==1.33.0
 
