@@ -1,0 +1,83 @@
+# Video Content Compliance Standards for Company Website
+**Document Number:** VID-COMP-001  
+**Last Updated:** March 2025  
+**Department:** Content Operations
+
+## 1. CONTENT TYPE REQUIREMENTS
+
+### 1.1 News Content
+- **Essential Elements (5W's):**
+  - Who: Key individuals/organizations involved
+  - What: Main event/incident description
+  - Where: Specific location, city, country
+  - When: Date and time of event
+  - Why: Context and cause of the event
+
+### 1.2 Film Content
+- **Required Elements:**
+  - Movie title and release year
+  - Cast members and their roles
+  - Genre classification
+  - Content rating
+
+### 1.3 Sports Content
+- **Required Elements:**
+  - Event name and type
+  - Athletes/Players and their teams
+  - Venue name and location
+  - Date and time of event
+  - Match/Game outcome (if applicable)
+
+## 2. DISTRIBUTION CHANNEL REQUIREMENTS
+- Title: Maximum 120 characters
+- Description: Maximum 200 words
+- Minimum 3 tags required
+- Voice: Professional and informative
+- All titles must use title case
+- Structure: Intro, body, call-to-action
+
+## 3. DATA MODELS
+
+```json
+{
+    "title": "[Catchy title for video]",
+    "description": "[Insert Video Description]",
+    "tags": ["", "", ""]
+}
+```
+### 3.1 News Content Data Model Example:
+```json
+{
+    "title": "Breaking: Tech Giant Unveils AI Innovation in Silicon Valley",
+    "description": "Industry leader ABC Technologies revealed their revolutionary AI platform at their Palo Alto headquarters today. CEO Jane Smith demonstrated the groundbreaking technology to over 200 industry leaders and media representatives.\n\nThe new AI system, named 'InnovAI,' showcases unprecedented capabilities in natural language processing and real-time decision making. Early testing shows a 300% improvement over existing solutions.\n\nWatch the full presentation to learn how this technology will transform the future of artificial intelligence and impact various industries.",
+    "tags": ["Technology", "Silicon Valley", "Artificial Intelligence"]
+}
+```
+
+### 3.2 Film Content Data Model Example:
+```json
+{
+    "title": "Dune: Behind the Scenes with Timothée Chalamet",
+    "description": "Step into the vast world of Arrakis with an exclusive behind-the-scenes look at Denis Villeneuve's epic sci-fi masterpiece.\n\nTimothée Chalamet leads the stellar cast as Paul Atreides, alongside Rebecca Ferguson as Lady Jessica and Zendaya as Chani. Watch as they reveal the challenges and triumphs of bringing Frank Herbert's classic novel to life.\n\nDon't miss this exclusive glimpse into the making of 2024's most anticipated film, releasing worldwide next month.",
+    "tags": ["Dune", "Sci-Fi", "Timothée Chalamet"]
+}
+```
+
+### 3.3 Sports Content Data Model Example:
+```json
+{
+    "title": "Super Bowl LVIII: Chiefs vs 49ers at Allegiant Stadium",
+    "description": "The stage is set for an epic showdown at Las Vegas's Allegiant Stadium as the Kansas City Chiefs face the San Francisco 49ers in Super Bowl LVIII.\n\nPatrick Mahomes leads the defending champion Chiefs against Brock Purdy's explosive 49ers offense in what promises to be a historic matchup. Both teams bring impressive regular season records and playoff performances.\n\nTune in this Sunday at 6:30 PM EST to witness this championship clash live on our premium sports channel.",
+    "tags": ["NFL", "Super Bowl", "Las Vegas"]
+}
+```
+
+## 4. COMPLIANCE CHECKLIST
+- [ ] Title follows content type format and is under 120 characters
+- [ ] Description meets 200-word limit
+- [ ] Description includes intro, body, and call-to-action
+- [ ] Three or more relevant tags included
+- [ ] Professional tone maintained throughout
+- [ ] Content type specific requirements met
+
+**End of Video Content Compliance Standards for Company Website**

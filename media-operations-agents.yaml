@@ -1,0 +1,1137 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Sports Agent Infrastructure with S3 Vector Store'
+
+Parameters:
+  BaseName:
+    Type: String
+    Default: 'media-agents'
+    Description: 'Base name for all resources'
+
+Resources:
+  # ============================================================================
+  # S3 DATA BUCKETS
+  # ============================================================================
+  
+  SportsDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BaseName}-sports-data-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  ComplianceDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BaseName}-compliance-data-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  NewsDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BaseName}-news-data-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  FilmsDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BaseName}-films-data-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # ============================================================================
+  # DYNAMODB TABLES
+  # ============================================================================
+  
+  PlayersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'players-${AWS::AccountId}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: team_name
+          AttributeType: S
+        - AttributeName: player_number
+          AttributeType: S
+      KeySchema:
+        - AttributeName: team_name
+          KeyType: HASH
+        - AttributeName: player_number
+          KeyType: RANGE
+
+  CastMembersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'cast-${AWS::AccountId}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: name
+          AttributeType: S
+        - AttributeName: film
+          AttributeType: S
+      KeySchema:
+        - AttributeName: name
+          KeyType: HASH
+        - AttributeName: film
+          KeyType: RANGE
+
+  # ============================================================================
+  # IAM ROLES
+  # ============================================================================
+  
+  # Knowledge Base Execution Role
+  KnowledgeBaseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'AmazonBedrockKBRole-${BaseName}-${AWS::AccountId}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BedrockKBPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket]
+                Resource: 
+                  - !GetAtt SportsDataBucket.Arn
+                  - !Sub '${SportsDataBucket.Arn}/*'
+                  - !GetAtt ComplianceDataBucket.Arn
+                  - !Sub '${ComplianceDataBucket.Arn}/*'
+                  - !GetAtt NewsDataBucket.Arn
+                  - !Sub '${NewsDataBucket.Arn}/*'
+                  - !GetAtt FilmsDataBucket.Arn
+                  - !Sub '${FilmsDataBucket.Arn}/*'
+              - Effect: Allow
+                Action: bedrock:InvokeModel
+                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${BaseName}-*-vector-${AWS::AccountId}'
+                  - !Sub 'arn:aws:s3:::${BaseName}-*-vector-${AWS::AccountId}/*'
+              - Effect: Allow
+                Action:
+                  - s3vectors:*
+                Resource:
+                  - !Sub 'arn:aws:s3vectors:${AWS::Region}:${AWS::AccountId}:bucket/${BaseName}-*-vector-${AWS::AccountId}'
+                  - !Sub 'arn:aws:s3vectors:${AWS::Region}:${AWS::AccountId}:bucket/${BaseName}-*-vector-${AWS::AccountId}/*'
+
+  # Lambda Role for Vector Store Management
+  VectorStoreLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-VectorStoreLambdaRole'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  VectorStoreLambdaPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3vectors:*
+            Resource:
+              - !Sub 'arn:aws:s3vectors:${AWS::Region}:${AWS::AccountId}:bucket/${BaseName}-*-vector-${AWS::AccountId}'
+              - !Sub 'arn:aws:s3vectors:${AWS::Region}:${AWS::AccountId}:bucket/${BaseName}-*-vector-${AWS::AccountId}/*'
+          - Effect: Allow
+            Action:
+              - bedrock:CreateKnowledgeBase
+              - bedrock:DeleteKnowledgeBase
+              - bedrock:GetKnowledgeBase
+              - bedrock:CreateDataSource
+              - bedrock:DeleteDataSource
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource: 
+              - !GetAtt KnowledgeBaseRole.Arn
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/agentcore-sports-gateway-role'
+          - Effect: Allow
+            Action:
+              - cognito-idp:CreateUserPool
+              - cognito-idp:DeleteUserPool
+              - cognito-idp:CreateResourceServer
+              - cognito-idp:DeleteResourceServer
+              - cognito-idp:CreateUserPoolClient
+              - cognito-idp:DeleteUserPoolClient
+              - cognito-idp:CreateUserPoolDomain
+              - cognito-idp:DeleteUserPoolDomain
+            Resource: '*'
+
+      Roles:
+        - !Ref VectorStoreLambdaRole
+
+  # ============================================================================
+  # LAMBDA FUNCTIONS FOR S3 VECTORS
+  # ============================================================================
+  
+  VectorStoreLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: VectorStoreLambdaPolicy
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-vector-store'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt VectorStoreLambdaRole.Arn
+      Timeout: 900
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          
+          def handler(event, context):
+              try:
+                  s3vectors = boto3.client('s3vectors')
+                  bucket_name = event['ResourceProperties']['BucketName']
+                  
+                  if event['RequestType'] == 'Create':
+                      print(f"Creating S3 Vector bucket: {bucket_name}")
+                      try:
+                          s3vectors.create_vector_bucket(vectorBucketName=bucket_name)
+                      except s3vectors.exceptions.ConflictException:
+                          print(f"Bucket already exists: {bucket_name}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {'BucketName': bucket_name})
+                      
+                  elif event['RequestType'] == 'Delete':
+                      print(f"Deleting S3 Vector bucket: {bucket_name}")
+                      try:
+                          indexes = s3vectors.list_indexes(vectorBucketName=bucket_name)
+                          for index in indexes.get('indexes', []):
+                              s3vectors.delete_index(vectorBucketName=bucket_name, indexName=index['indexName'])
+                          s3vectors.delete_vector_bucket(vectorBucketName=bucket_name)
+                      except Exception as e:
+                          print(f"Error during deletion: {e}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      
+                  else:
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {'BucketName': bucket_name})
+                      
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  CreateIndexLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: VectorStoreLambdaPolicy
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-create-index'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt VectorStoreLambdaRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          
+          def handler(event, context):
+              try:
+                  s3vectors = boto3.client('s3vectors')
+                  bucket_name = event['ResourceProperties']['BucketName']
+                  index_name = event['ResourceProperties']['IndexName']
+                  
+                  if event['RequestType'] == 'Create':
+                      print(f"Creating index {index_name} in bucket {bucket_name}")
+                      response = s3vectors.create_index(
+                          vectorBucketName=bucket_name,
+                          indexName=index_name,
+                          dataType='float32',
+                          dimension=1024,
+                          distanceMetric='cosine',
+                          metadataConfiguration={
+                              'nonFilterableMetadataKeys': ['AMAZON_BEDROCK_TEXT']
+                          }
+                      )
+                      
+                      if 'indexArn' in response:
+                          index_arn = response['indexArn']
+                      elif 'index' in response and 'indexArn' in response['index']:
+                          index_arn = response['index']['indexArn']
+                      else:
+                          list_response = s3vectors.list_indexes(vectorBucketName=bucket_name)
+                          index_arn = list_response['indexes'][0]['indexArn']
+                      
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'IndexName': index_name,
+                          'IndexArn': index_arn
+                      })
+                      
+                  elif event['RequestType'] == 'Delete':
+                      print(f"Deleting index {index_name}")
+                      try:
+                          s3vectors.delete_index(vectorBucketName=bucket_name, indexName=index_name)
+                      except Exception as e:
+                          print(f"Error during deletion: {e}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      
+                  else:
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {'IndexName': index_name})
+                      
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  CreateKnowledgeBaseLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: VectorStoreLambdaPolicy
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-create-kb'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt VectorStoreLambdaRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          
+          def handler(event, context):
+              try:
+                  bedrock = boto3.client('bedrock-agent')
+                  
+                  kb_name = event['ResourceProperties']['Name']
+                  description = event['ResourceProperties']['Description']
+                  role_arn = event['ResourceProperties']['RoleArn']
+                  embedding_model_arn = event['ResourceProperties']['EmbeddingModelArn']
+                  index_arn = event['ResourceProperties']['IndexArn']
+                  
+                  if event['RequestType'] == 'Create':
+                      print(f"Creating Knowledge Base: {kb_name}")
+                      response = bedrock.create_knowledge_base(
+                          name=kb_name,
+                          description=description,
+                          roleArn=role_arn,
+                          knowledgeBaseConfiguration={
+                              'type': 'VECTOR',
+                              'vectorKnowledgeBaseConfiguration': {
+                                  'embeddingModelArn': embedding_model_arn,
+                                  'embeddingModelConfiguration': {
+                                      'bedrockEmbeddingModelConfiguration': {
+                                          'dimensions': 1024
+                                      }
+                                  }
+                              }
+                          },
+                          storageConfiguration={
+                              'type': 'S3_VECTORS',
+                              's3VectorsConfiguration': {
+                                  'indexArn': index_arn
+                              }
+                          }
+                      )
+                      
+                      kb_id = response['knowledgeBase']['knowledgeBaseId']
+                      kb_arn = response['knowledgeBase']['knowledgeBaseArn']
+                      
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'KnowledgeBaseId': kb_id,
+                          'KnowledgeBaseArn': kb_arn
+                      }, physicalResourceId=kb_id)
+                      
+                  elif event['RequestType'] == 'Delete':
+                      kb_id = event['PhysicalResourceId']
+                      print(f"Deleting Knowledge Base: {kb_id}")
+                      try:
+                          bedrock.delete_knowledge_base(knowledgeBaseId=kb_id)
+                      except Exception as e:
+                          print(f"Error during deletion: {e}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      
+                  else:
+                      kb_id = event['PhysicalResourceId']
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'KnowledgeBaseId': kb_id
+                      }, physicalResourceId=kb_id)
+                      
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  import traceback
+                  traceback.print_exc()
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  CreateDataSourceLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: VectorStoreLambdaPolicy
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-create-datasource'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt VectorStoreLambdaRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          
+          def handler(event, context):
+              try:
+                  bedrock = boto3.client('bedrock-agent')
+                  
+                  kb_id = event['ResourceProperties']['KnowledgeBaseId']
+                  ds_name = event['ResourceProperties']['Name']
+                  description = event['ResourceProperties']['Description']
+                  
+                  if event['RequestType'] == 'Create':
+                      print(f"Creating Data Source: {ds_name} for KB: {kb_id}")
+                      bucket_name = event['ResourceProperties']['BucketName']
+                      response = bedrock.create_data_source(
+                          knowledgeBaseId=kb_id,
+                          name=ds_name,
+                          description=description,
+                          dataSourceConfiguration={
+                              'type': 'S3',
+                              's3Configuration': {
+                                  'bucketArn': f'arn:aws:s3:::{bucket_name}'
+                              }
+                          },
+                          dataDeletionPolicy='RETAIN'
+                      )
+                      
+                      ds_id = response['dataSource']['dataSourceId']
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'DataSourceId': ds_id
+                      }, physicalResourceId=ds_id)
+                      
+                  elif event['RequestType'] == 'Delete':
+                      ds_id = event['PhysicalResourceId']
+                      print(f"Deleting Data Source: {ds_id}")
+                      try:
+                          bedrock.delete_data_source(
+                              knowledgeBaseId=kb_id,
+                              dataSourceId=ds_id
+                          )
+                      except Exception as e:
+                          print(f"Error during deletion: {e}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      
+                  else:
+                      ds_id = event['PhysicalResourceId']
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'DataSourceId': ds_id
+                      }, physicalResourceId=ds_id)
+                      
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  import traceback
+                  traceback.print_exc()
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  # Lambda for Cognito
+  CognitoLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: VectorStoreLambdaPolicy
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-cognito'
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt VectorStoreLambdaRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import cfnresponse
+          
+          def handler(event, context):
+              try:
+                  cognito = boto3.client('cognito-idp')
+                  
+                  if event['RequestType'] == 'Create':
+                      pool_name = event['ResourceProperties']['PoolName']
+                      resource_server_id = event['ResourceProperties']['ResourceServerId']
+                      client_name = event['ResourceProperties']['ClientName']
+                      
+                      # Create User Pool
+                      pool_response = cognito.create_user_pool(
+                          PoolName=pool_name,
+                          Policies={
+                              'PasswordPolicy': {
+                                  'MinimumLength': 8,
+                                  'RequireUppercase': False,
+                                  'RequireLowercase': False,
+                                  'RequireNumbers': False,
+                                  'RequireSymbols': False
+                              }
+                          }
+                      )
+                      user_pool_id = pool_response['UserPool']['Id']
+                      
+                      # Create Resource Server
+                      cognito.create_resource_server(
+                          UserPoolId=user_pool_id,
+                          Identifier=resource_server_id,
+                          Name=f'{resource_server_id}-server',
+                          Scopes=[
+                              {'ScopeName': 'gateway:read', 'ScopeDescription': 'Read access'},
+                              {'ScopeName': 'gateway:write', 'ScopeDescription': 'Write access'}
+                          ]
+                      )
+                      
+                      # Create App Client
+                      client_response = cognito.create_user_pool_client(
+                          UserPoolId=user_pool_id,
+                          ClientName=client_name,
+                          GenerateSecret=True,
+                          AllowedOAuthFlows=['client_credentials'],
+                          AllowedOAuthScopes=[
+                              f'{resource_server_id}/gateway:read',
+                              f'{resource_server_id}/gateway:write'
+                          ],
+                          AllowedOAuthFlowsUserPoolClient=True
+                      )
+                      
+                      client_id = client_response['UserPoolClient']['ClientId']
+                      client_secret = client_response['UserPoolClient']['ClientSecret']
+                      
+                      # Create Cognito domain for OAuth endpoints
+                      cognito_domain = user_pool_id.replace('_', '').lower()
+                      cognito.create_user_pool_domain(
+                          Domain=cognito_domain,
+                          UserPoolId=user_pool_id
+                      )
+                      print(f"Created Cognito domain: {cognito_domain}")
+                      
+                      region = context.invoked_function_arn.split(':')[3]
+                      discovery_url = f'https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/openid-configuration'
+                      
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'UserPoolId': user_pool_id,
+                          'ClientId': client_id,
+                          'ClientSecret': client_secret,
+                          'CognitoDomain': cognito_domain,
+                          'DiscoveryUrl': discovery_url
+                      }, physicalResourceId=user_pool_id)
+                      
+                  elif event['RequestType'] == 'Delete':
+                      user_pool_id = event['PhysicalResourceId']
+                      try:
+                          # Delete domain first
+                          cognito_domain = user_pool_id.replace('_', '').lower()
+                          try:
+                              cognito.delete_user_pool_domain(
+                                  Domain=cognito_domain,
+                                  UserPoolId=user_pool_id
+                              )
+                              print(f"Deleted domain: {cognito_domain}")
+                          except Exception as e:
+                              print(f"Domain deletion note: {e}")
+                          
+                          # Delete user pool
+                          cognito.delete_user_pool(UserPoolId=user_pool_id)
+                          print(f"Deleted user pool: {user_pool_id}")
+                      except Exception as e:
+                          print(f"Error during deletion: {e}")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      
+                  else:
+                      user_pool_id = event['PhysicalResourceId']
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'UserPoolId': user_pool_id
+                      }, physicalResourceId=user_pool_id)
+                      
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  import traceback
+                  traceback.print_exc()
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  # ============================================================================
+  # LAMBDA FUNCTION
+  # ============================================================================
+  
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'lambda-sports-agent-tools-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: LambdaToolsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock-agent-runtime:Retrieve
+                  - bedrock:Retrieve
+                  - bedrock:InvokeModel
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt PlayersTable.Arn
+                  - !GetAtt CastMembersTable.Arn
+              - Effect: Allow
+                Action:
+                  - rekognition:StartCelebrityRecognition
+                  - rekognition:GetCelebrityRecognition
+                Resource: '*'
+
+  SportsToolsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: sports-agent-tools
+      Runtime: python3.12
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder - update with actual code'}
+      Environment:
+        Variables:
+          SPORTS_KB_ID: !GetAtt SportsKnowledgeBase.KnowledgeBaseId
+          COMPLIANCE_KB_ID: !GetAtt ComplianceKnowledgeBase.KnowledgeBaseId
+          NEWS_KB_ID: !GetAtt NewsKnowledgeBase.KnowledgeBaseId
+          FILMS_KB_ID: !GetAtt FilmsKnowledgeBase.KnowledgeBaseId
+          DYNAMODB_TABLE: !Ref PlayersTable
+          CAST_TABLE: !Ref CastMembersTable
+
+  GatewayExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'agentcore-sports-gateway-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock-agentcore.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: GatewayLambdaInvokePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt SportsToolsLambda.Arn
+
+  # ============================================================================
+  # COGNITO
+  # ============================================================================
+  
+  CognitoResources:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt CognitoLambda.Arn
+      PoolName: !Sub '${BaseName}-gateway-pool'
+      ResourceServerId: !Sub '${BaseName}-gateway-id'
+      ClientName: !Sub '${BaseName}-gateway-client'
+
+  # ============================================================================
+  # AGENTCORE GATEWAY
+  # ============================================================================
+  
+  AgentCoreGateway:
+    Type: AWS::BedrockAgentCore::Gateway
+    DependsOn:
+      - CognitoResources
+      - SportsToolsLambda
+    Properties:
+      Name: !Sub '${BaseName}-gateway'
+      Description: 'AgentCore Gateway for sports tools'
+      RoleArn: !GetAtt GatewayExecutionRole.Arn
+      ProtocolType: MCP
+      AuthorizerType: CUSTOM_JWT
+      AuthorizerConfiguration:
+        CustomJWTAuthorizer:
+          AllowedClients:
+            - !GetAtt CognitoResources.ClientId
+          DiscoveryUrl: !GetAtt CognitoResources.DiscoveryUrl
+
+  GatewayTarget:
+    Type: AWS::BedrockAgentCore::GatewayTarget
+    DependsOn: AgentCoreGateway
+    Properties:
+      GatewayIdentifier: !Ref AgentCoreGateway
+      Name: !Sub '${BaseName}-lambda-target'
+      Description: 'Lambda target for sports tools'
+      CredentialProviderConfigurations:
+        - CredentialProviderType: GATEWAY_IAM_ROLE
+      TargetConfiguration:
+        Mcp:
+          Lambda:
+            LambdaArn: !GetAtt SportsToolsLambda.Arn
+            ToolSchema:
+              InlinePayload:
+                - Name: retrieve_match_info
+                  Description: 'Retrieve match information from sports knowledge base'
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      query:
+                        Type: string
+                        Description: 'Search query for match information'
+                    Required:
+                      - query
+                - Name: retrieve_compliance_requirements
+                  Description: 'Retrieve compliance requirements'
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      query:
+                        Type: string
+                        Description: 'Search query for compliance information'
+                    Required:
+                      - query
+                - Name: retrieve_news_articles
+                  Description: 'Retrieve news articles'
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      query:
+                        Type: string
+                        Description: 'Search query for news'
+                    Required:
+                      - query
+                - Name: retrieve_film_info
+                  Description: 'Retrieve film information'
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      query:
+                        Type: string
+                        Description: 'Search query for films'
+                    Required:
+                      - query
+                - Name: lookup_player_info
+                  Description: 'Get player information from DynamoDB'
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      team_name:
+                        Type: string
+                        Description: 'Team name'
+                      player_number:
+                        Type: string
+                        Description: 'Player number'
+                    Required:
+                      - team_name
+                      - player_number
+                - Name: get_cast_member
+                  Description: 'Get cast member information from DynamoDB'
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      name:
+                        Type: string
+                        Description: 'Cast member name'
+                      film:
+                        Type: string
+                        Description: 'Film name'
+                    Required:
+                      - name
+                      - film
+                - Name: identify_people_with_rekognition
+                  Description: 'Analyze celebrity in image using Rekognition'
+                  InputSchema:
+                    Type: object
+                    Properties:
+                      s3_url:
+                        Type: string
+                        Description: 'S3 URL of the image'
+                    Required:
+                      - s3_url
+
+  # ============================================================================
+  # S3 VECTOR RESOURCES
+  # ============================================================================
+  
+  SportsVectorBucket:
+    Type: Custom::VectorBucket
+    Properties:
+      ServiceToken: !GetAtt VectorStoreLambda.Arn
+      BucketName: !Sub '${BaseName}-sports-vector-${AWS::AccountId}'
+
+  SportsVectorIndex:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: SportsVectorBucket
+    Properties:
+      ServiceToken: !GetAtt CreateIndexLambda.Arn
+      BucketName: !Sub '${BaseName}-sports-vector-${AWS::AccountId}'
+      IndexName: sports-index
+
+  # ============================================================================
+  # KNOWLEDGE BASE
+  # ============================================================================
+  
+  SportsKnowledgeBase:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: SportsVectorIndex
+    Properties:
+      ServiceToken: !GetAtt CreateKnowledgeBaseLambda.Arn
+      Name: !Sub '${BaseName}-sports-kb'
+      Description: 'Sports match information knowledge base'
+      RoleArn: !GetAtt KnowledgeBaseRole.Arn
+      EmbeddingModelArn: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0'
+      IndexArn: !GetAtt SportsVectorIndex.IndexArn
+
+  SportsDataSource:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: SportsKnowledgeBase
+    Properties:
+      ServiceToken: !GetAtt CreateDataSourceLambda.Arn
+      KnowledgeBaseId: !GetAtt SportsKnowledgeBase.KnowledgeBaseId
+      Name: !Sub '${BaseName}-sports-datasource'
+      Description: 'Sports data source'
+      BucketName: !Ref SportsDataBucket
+
+  # Compliance KB
+  ComplianceVectorBucket:
+    Type: Custom::VectorBucket
+    Properties:
+      ServiceToken: !GetAtt VectorStoreLambda.Arn
+      BucketName: !Sub '${BaseName}-compliance-vector-${AWS::AccountId}'
+
+  ComplianceVectorIndex:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: ComplianceVectorBucket
+    Properties:
+      ServiceToken: !GetAtt CreateIndexLambda.Arn
+      BucketName: !Sub '${BaseName}-compliance-vector-${AWS::AccountId}'
+      IndexName: compliance-index
+
+  ComplianceKnowledgeBase:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: ComplianceVectorIndex
+    Properties:
+      ServiceToken: !GetAtt CreateKnowledgeBaseLambda.Arn
+      Name: !Sub '${BaseName}-compliance-kb'
+      Description: 'Compliance requirements knowledge base'
+      RoleArn: !GetAtt KnowledgeBaseRole.Arn
+      EmbeddingModelArn: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0'
+      IndexArn: !GetAtt ComplianceVectorIndex.IndexArn
+
+  ComplianceDataSource:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: ComplianceKnowledgeBase
+    Properties:
+      ServiceToken: !GetAtt CreateDataSourceLambda.Arn
+      KnowledgeBaseId: !GetAtt ComplianceKnowledgeBase.KnowledgeBaseId
+      Name: !Sub '${BaseName}-compliance-datasource'
+      Description: 'Compliance data source'
+      BucketName: !Ref ComplianceDataBucket
+
+  # News KB
+  NewsVectorBucket:
+    Type: Custom::VectorBucket
+    Properties:
+      ServiceToken: !GetAtt VectorStoreLambda.Arn
+      BucketName: !Sub '${BaseName}-news-vector-${AWS::AccountId}'
+
+  NewsVectorIndex:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: NewsVectorBucket
+    Properties:
+      ServiceToken: !GetAtt CreateIndexLambda.Arn
+      BucketName: !Sub '${BaseName}-news-vector-${AWS::AccountId}'
+      IndexName: news-index
+
+  NewsKnowledgeBase:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: NewsVectorIndex
+    Properties:
+      ServiceToken: !GetAtt CreateKnowledgeBaseLambda.Arn
+      Name: !Sub '${BaseName}-news-kb'
+      Description: 'News articles knowledge base'
+      RoleArn: !GetAtt KnowledgeBaseRole.Arn
+      EmbeddingModelArn: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0'
+      IndexArn: !GetAtt NewsVectorIndex.IndexArn
+
+  NewsDataSource:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: NewsKnowledgeBase
+    Properties:
+      ServiceToken: !GetAtt CreateDataSourceLambda.Arn
+      KnowledgeBaseId: !GetAtt NewsKnowledgeBase.KnowledgeBaseId
+      Name: !Sub '${BaseName}-news-datasource'
+      Description: 'News data source'
+      BucketName: !Ref NewsDataBucket
+
+  # Films KB
+  FilmsVectorBucket:
+    Type: Custom::VectorBucket
+    Properties:
+      ServiceToken: !GetAtt VectorStoreLambda.Arn
+      BucketName: !Sub '${BaseName}-films-vector-${AWS::AccountId}'
+
+  FilmsVectorIndex:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: FilmsVectorBucket
+    Properties:
+      ServiceToken: !GetAtt CreateIndexLambda.Arn
+      BucketName: !Sub '${BaseName}-films-vector-${AWS::AccountId}'
+      IndexName: films-index
+
+  FilmsKnowledgeBase:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: FilmsVectorIndex
+    Properties:
+      ServiceToken: !GetAtt CreateKnowledgeBaseLambda.Arn
+      Name: !Sub '${BaseName}-films-kb'
+      Description: 'Film information knowledge base'
+      RoleArn: !GetAtt KnowledgeBaseRole.Arn
+      EmbeddingModelArn: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0'
+      IndexArn: !GetAtt FilmsVectorIndex.IndexArn
+
+  FilmsDataSource:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn: FilmsKnowledgeBase
+    Properties:
+      ServiceToken: !GetAtt CreateDataSourceLambda.Arn
+      KnowledgeBaseId: !GetAtt FilmsKnowledgeBase.KnowledgeBaseId
+      Name: !Sub '${BaseName}-films-datasource'
+      Description: 'Films data source'
+      BucketName: !Ref FilmsDataBucket
+
+  # ============================================================================
+  # SSM PARAMETERS FOR AGENT CONFIGURATION
+  # ============================================================================
+  
+  GatewayUrlParameter:
+    Type: AWS::SSM::Parameter
+    DependsOn: AgentCoreGateway
+    Properties:
+      Name: /sports-agent/gateway_url
+      Type: String
+      Value: !GetAtt AgentCoreGateway.GatewayUrl
+      Description: AgentCore Gateway URL for sports agent tools
+
+  GatewayIdParameter:
+    Type: AWS::SSM::Parameter
+    DependsOn: AgentCoreGateway
+    Properties:
+      Name: /sports-agent/gateway_id
+      Type: String
+      Value: !Ref AgentCoreGateway
+      Description: AgentCore Gateway ID
+
+  CognitoUserPoolIdParameter:
+    Type: AWS::SSM::Parameter
+    DependsOn: CognitoResources
+    Properties:
+      Name: /sports-agent/cognito_user_pool_id
+      Type: String
+      Value: !GetAtt CognitoResources.UserPoolId
+      Description: Cognito User Pool ID for authentication
+
+  CognitoDomainParameter:
+    Type: AWS::SSM::Parameter
+    DependsOn: CognitoResources
+    Properties:
+      Name: /sports-agent/cognito_domain
+      Type: String
+      Value: !GetAtt CognitoResources.CognitoDomain
+      Description: Cognito domain for OAuth endpoints
+
+  CognitoClientIdParameter:
+    Type: AWS::SSM::Parameter
+    DependsOn: CognitoResources
+    Properties:
+      Name: /sports-agent/cognito_client_id
+      Type: String
+      Value: !GetAtt CognitoResources.ClientId
+      Description: Cognito OAuth client ID
+
+  CognitoClientSecretParameter:
+    Type: AWS::SSM::Parameter
+    DependsOn: CognitoResources
+    Properties:
+      Name: /sports-agent/cognito_client_secret
+      Type: String
+      Value: !GetAtt CognitoResources.ClientSecret
+      Description: Cognito OAuth client secret
+
+  CognitoDiscoveryUrlParameter:
+    Type: AWS::SSM::Parameter
+    DependsOn: CognitoResources
+    Properties:
+      Name: /sports-agent/cognito_discovery_url
+      Type: String
+      Value: !GetAtt CognitoResources.DiscoveryUrl
+      Description: Cognito OIDC discovery URL for JWT validation
+
+Outputs:
+  # Knowledge Bases
+  SportsKnowledgeBaseId:
+    Value: !GetAtt SportsKnowledgeBase.KnowledgeBaseId
+    Export:
+      Name: !Sub '${AWS::StackName}-SportsKBId'
+
+  ComplianceKnowledgeBaseId:
+    Value: !GetAtt ComplianceKnowledgeBase.KnowledgeBaseId
+    Export:
+      Name: !Sub '${AWS::StackName}-ComplianceKBId'
+
+  NewsKnowledgeBaseId:
+    Value: !GetAtt NewsKnowledgeBase.KnowledgeBaseId
+    Export:
+      Name: !Sub '${AWS::StackName}-NewsKBId'
+
+  FilmsKnowledgeBaseId:
+    Value: !GetAtt FilmsKnowledgeBase.KnowledgeBaseId
+    Export:
+      Name: !Sub '${AWS::StackName}-FilmsKBId'
+
+  # Data Sources
+  SportsDataSourceId:
+    Value: !GetAtt SportsDataSource.DataSourceId
+    Export:
+      Name: !Sub '${AWS::StackName}-SportsDataSourceId'
+
+  ComplianceDataSourceId:
+    Value: !GetAtt ComplianceDataSource.DataSourceId
+    Export:
+      Name: !Sub '${AWS::StackName}-ComplianceDataSourceId'
+
+  NewsDataSourceId:
+    Value: !GetAtt NewsDataSource.DataSourceId
+    Export:
+      Name: !Sub '${AWS::StackName}-NewsDataSourceId'
+
+  FilmsDataSourceId:
+    Value: !GetAtt FilmsDataSource.DataSourceId
+    Export:
+      Name: !Sub '${AWS::StackName}-FilmsDataSourceId'
+
+  # S3 Buckets
+  SportsDataBucket:
+    Value: !Ref SportsDataBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-SportsDataBucket'
+
+  ComplianceDataBucket:
+    Value: !Ref ComplianceDataBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-ComplianceDataBucket'
+
+  NewsDataBucket:
+    Value: !Ref NewsDataBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-NewsDataBucket'
+
+  FilmsDataBucket:
+    Value: !Ref FilmsDataBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-FilmsDataBucket'
+
+  # DynamoDB Tables
+  PlayersTableName:
+    Value: !Ref PlayersTable
+    Export:
+      Name: !Sub '${AWS::StackName}-PlayersTable'
+
+  CastMembersTableName:
+    Value: !Ref CastMembersTable
+    Export:
+      Name: !Sub '${AWS::StackName}-CastTable'
+
+  # Lambda
+  LambdaFunctionArn:
+    Value: !GetAtt SportsToolsLambda.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaArn'
+
+  LambdaFunctionName:
+    Value: !Ref SportsToolsLambda
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaName'
+
+  GatewayRoleArn:
+    Value: !GetAtt GatewayExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-GatewayRoleArn'
+
+  # Cognito
+  CognitoUserPoolId:
+    Value: !GetAtt CognitoResources.UserPoolId
+    Export:
+      Name: !Sub '${AWS::StackName}-UserPoolId'
+
+  CognitoClientId:
+    Value: !GetAtt CognitoResources.ClientId
+    Export:
+      Name: !Sub '${AWS::StackName}-ClientId'
+
+  CognitoClientSecret:
+    Value: !GetAtt CognitoResources.ClientSecret
+
+  CognitoDiscoveryUrl:
+    Value: !GetAtt CognitoResources.DiscoveryUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-DiscoveryUrl'
+
+  CognitoDomain:
+    Value: !GetAtt CognitoResources.CognitoDomain
+    Export:
+      Name: !Sub '${AWS::StackName}-CognitoDomain'
+
+  # Gateway
+  GatewayId:
+    Value: !Ref AgentCoreGateway
+    Export:
+      Name: !Sub '${AWS::StackName}-GatewayId'
+
+  GatewayUrl:
+    Value: !GetAtt AgentCoreGateway.GatewayUrl
+    Export:
+      Name: !Sub '${AWS::StackName}-GatewayUrl'
+
+  GatewayTargetId:
+    Value: !Ref GatewayTarget
+    Export:
+      Name: !Sub '${AWS::StackName}-GatewayTargetId'

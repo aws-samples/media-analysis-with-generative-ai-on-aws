@@ -1,13 +1,14 @@
 # AWS SDK and services
-boto3==1.40.65
+boto3>=1.35.0
 botocore==1.40.65
 amazon-transcribe==0.6.4
 
 # AWS Agentic AI
 strands-agents>=1.16.0
 strands-agents-tools==0.2.14
-bedrock-agentcore==1.0.5
+bedrock-agentcore>=1.0.6
 bedrock-agentcore-starter-toolkit==0.1.22
+sagemaker
 
 # Async and networking
 asyncio-mqtt
@@ -47,11 +48,11 @@ faiss-cpu>=1.9.0
 opensearch-py==2.7.1
 
 # MCP and observability
-mcp
+mcp==1.18.0
 openinference-semantic-conventions==0.1.17
 opentelemetry-exporter-otlp-proto-http==1.33.0
 
-# Utilities
+# Development and utilities
 python-dotenv
 json-repair==0.44.1
 termcolor==2.5.0

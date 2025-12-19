@@ -1,0 +1,17 @@
+boto3>=1.40.14
+botocore>=1.40.14
+retrying
+mcp>=1.19.0
+openinference-semantic-conventions==0.1.17
+opentelemetry-exporter-otlp-proto-http==1.33.0
+strands-agents>=1.14.0
+strands-agents-tools>=0.2.13
+opensearch-py
+opencv-python-headless
+pillow
+numpy
+json-repair
+uv
+bedrock-agentcore>=1.0.5
+bedrock-agentcore-starter-toolkit>=0.1.27
+markdown

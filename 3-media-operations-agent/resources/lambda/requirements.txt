@@ -1,0 +1,3 @@
+# No external packages required
+# boto3 is already included in AWS Lambda Python runtime
+# All other imports are from Python standard library
