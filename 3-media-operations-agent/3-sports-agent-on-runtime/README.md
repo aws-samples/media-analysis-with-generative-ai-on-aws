@@ -91,15 +91,6 @@ response = agentcore_runtime.invoke(
 output = response["response"]
 ```
 
-## Production-Ready Architecture
-
-The runtime automatically handles the complete request lifecycle:
-1. **JWT Validation** - Verifies token authenticity and permissions
-2. **Request Routing** - Forwards to your containerized agent
-3. **Gateway Integration** - Retrieves gateway URL from SSM Parameter Store
-4. **Tool Discovery** - Connects to gateway and discovers available tools
-5. **Request Processing** - Executes agent logic with full tool access
-
 Your agent now runs in production with enterprise-grade security, auto-scaling, and built-in observability.
 
 ## What You'll Learn
