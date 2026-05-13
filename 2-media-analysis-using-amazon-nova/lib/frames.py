@@ -28,8 +28,9 @@ from IPython.display import Image as DisplayImage
 
 config = {
    "FRAME_PATH": "frames",
-   "TITAN_MODEL_ID": 'amazon.titan-embed-image-v1',
-   "TITAN_PRICING": 0.00006
+   "EMBEDDING_MODEL_ID": 'amazon.nova-2-multimodal-embeddings-v1:0',
+   "EMBEDDING_MODEL_REGION": 'us-east-1',
+   "EMBEDDING_DIMENSION": 1024,
 }
 
 # Must be h.264 video
@@ -48,7 +49,7 @@ class VideoFrames:
 
 
   def make_vector_store(self):
-    dimension = len(self.frames[0]['titan_multimodal_embedding'])
+    dimension = len(self.frames[0]['multimodal_embedding'])
     self.vector_store = self.create_index(dimension)
     #self.calculate_similar_frames()
 
@@ -336,7 +337,7 @@ class VideoFrames:
 
   def calculate_similar_frames(self, min_similarity = 0.80, max_interval = 30):
       
-      frame_embeddings = [frame['titan_multimodal_embedding'] for frame in self.frames]
+      frame_embeddings = [frame['multimodal_embedding'] for frame in self.frames]
 
       for idx, frame in enumerate(self.frames):
           similar_frames = self.search_similarity(idx, min_similarity = min_similarity, time_range = max_interval)
@@ -351,7 +352,7 @@ class VideoFrames:
 
   def index_frames(self, index):
         for frame in self.frames:
-            embedding = np.array([frame['titan_multimodal_embedding']])
+            embedding = np.array([frame['multimodal_embedding']])
             index.add(embedding)
       
         return index
@@ -362,7 +363,7 @@ class VideoFrames:
 
   def search_similarity(self, idx, k = 20, min_similarity = 0.80, time_range = 30):
         
-        embedding = np.array([self.frames[idx]['titan_multimodal_embedding']])
+        embedding = np.array([self.frames[idx]['multimodal_embedding']])
     
         D, I = self.vector_store.search(embedding, k)
     
@@ -440,53 +441,66 @@ class VideoFrames:
         # unique frames in shot
         return sorted(list(set(related_shots)))
 
-  def make_titan_multimodal_embeddings(self):
+  def make_multimodal_embeddings(self):
         """
-        Creates an image embedding for a frame. This function uses titan multimodal embedding model 
-        to create an embedding for the image frame.
-        
+        Creates an image embedding for each frame using Amazon Nova Multimodal Embeddings
+        on Amazon Bedrock. The model supports text, image, video, and audio inputs and
+        produces embeddings in a unified vector space for cross-modal retrieval.
+
+        Note: Nova Multimodal Embeddings is currently only available in us-east-1, so we
+        construct a dedicated bedrock-runtime client pinned to that region. Only these
+        small embedding calls cross regions; the rest of the workshop continues to run
+        in the learner's default region.
+
         Args:
            None
-        
+
         """
 
         video = urlparse(self.video_file)
         video_path = video.path
         video_dir = self.video_dir()
         frames_file = os.path.join(self.video_asset_dir(), 'frames.json')
-      
-        titan_model_id = config['TITAN_MODEL_ID']
+
+        model_id = config['EMBEDDING_MODEL_ID']
         accept = 'application/json'
         content_type = 'application/json'
 
-        bedrock_runtime_client = boto3.client(service_name='bedrock-runtime')
+        bedrock_runtime_client = boto3.client(
+            service_name='bedrock-runtime',
+            region_name=config['EMBEDDING_MODEL_REGION'],
+        )
 
         self.cost_embeddings = 0
 
         for frame in self.frames:
             with Image.open(frame['image_file']) as image:
                 input_image = image_utils.image_to_base64(image)
-    
+
             model_params = {
-                'inputImage': input_image,
-                'embeddingConfig': {
-                    'outputEmbeddingLength': 384 #1024 #384 #256
-                }
+                'taskType': 'SINGLE_EMBEDDING',
+                'singleEmbeddingParams': {
+                    'embeddingPurpose': 'GENERIC_INDEX',
+                    'embeddingDimension': config['EMBEDDING_DIMENSION'],
+                    'image': {
+                        'format': 'jpeg',
+                        'source': {'bytes': input_image},
+                    },
+                },
             }
-    
+
             body = json.dumps(model_params)
-    
+
             response = bedrock_runtime_client.invoke_model(
                 body=body,
-                modelId=titan_model_id,
+                modelId=model_id,
                 accept=accept,
                 contentType=content_type
             )
             response_body = json.loads(response.get('body').read())
-    
-            frame['titan_multimodal_embedding'] = response_body['embedding']
-            frame['titan_multimodal_embedding_model_id'] = titan_model_id
-            self.cost_embeddings = self.cost_embeddings + 0.00006
+
+            frame['multimodal_embedding'] = response_body['embeddings'][0]['embedding']
+            frame['multimodal_embedding_model_id'] = model_id
 
         util.save_to_file(frames_file, self.frames)
 
@@ -496,18 +510,18 @@ class VideoFrames:
         
         return
 
-  def load_titan_multimodal_embeddings(self):
+  def load_multimodal_embeddings(self):
         """
-        Loads precomputed image embeddings for a video. 
-        
+        Loads precomputed image embeddings for a video.
+
         Args:
            None
-        
+
         """
 
-        self.load_fastpath_results("frames-embeddings.json")           
-        self.cost_embeddings = len(self.frames) + 0.00006
-      
+        self.load_fastpath_results("frames-embeddings.json")
+        self.cost_embeddings = 0
+
         return
   
   def store_fastpath_results(self, result_file_name):

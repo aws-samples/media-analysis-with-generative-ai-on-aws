@@ -102,11 +102,27 @@ aws bedrock-agent start-ingestion-job \
 
 ## Model Configuration
 
-### Default Model IDs
-- **Visual Analysis**: `global.anthropic.claude-sonnet-4-20250514-v1:0`
-- **Audio Analysis**: `global.anthropic.claude-sonnet-4-20250514-v1:0`
-- **Audiovisual Fusion**: `global.anthropic.claude-sonnet-4-20250514-v1:0`
-- **Nova Models**: `us.amazon.nova-pro-v1:0`
+### Default Model IDs by module
+
+**Module 2 (Nova — visual/audio segmentation, ad breaks, semantic search, summarization):**
+- Generation: `global.amazon.nova-2-lite-v1:0` (Nova 2 Lite — unified multimodal)
+- Embeddings: `amazon.nova-2-multimodal-embeddings-v1:0` (Nova Multimodal Embeddings — us-east-1 only)
+- Reranking: `amazon.rerank-v1:0` (hard-coded to us-west-2 in `03-semantic-video-search.ipynb`; supports `rank_fields` in `additionalModelRequestFields`)
+
+**Module 3 (Media Operations Agents):**
+- Agent reasoning: `global.anthropic.claude-sonnet-4-5-20250929-v1:0`
+- Knowledge Base embeddings: `amazon.titan-embed-text-v2:0` (KBs don't support Nova MM Embed; Titan stays)
+
+**Module 4 (Live Media Analysis Agent):**
+- Visual/Audio/Audiovisual analysis: `global.anthropic.claude-sonnet-4-20250514-v1:0`
+- Live visual/audio understanding fallback: `us.amazon.nova-lite-v1:0`
+- Companion agent Knowledge Base embeddings: `amazon.titan-embed-text-v2:0`
+
+### Alternatives available in Bedrock
+- Claude Sonnet 4.6 (`global.anthropic.claude-sonnet-4-6`) — next-gen Sonnet
+- Claude Haiku 4.5 (`global.anthropic.claude-haiku-4-5-20251001-v1:0`) — fast, cheap
+- Nova 2 Sonic — speech
+- Cohere Rerank 3.5 (`cohere.rerank-v3-5:0`) — alternative reranker; only accepts `max_tokens_per_doc` in `additionalModelRequestFields` (rejects `rank_fields`)
 
 ### Agent Runtime
 - **Strands Agents**: Version 1.16.0+
