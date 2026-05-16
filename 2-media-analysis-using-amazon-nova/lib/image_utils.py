@@ -103,7 +103,7 @@ def create_composite_images(frames,
     Create composite images from a list of image files
     :param frames: list of image files
     :param output_dir: output directory
-    :param max_dimension: maximum dimension of the composite image. 1568x1568 is the optimal resolution for Claude 3 before the model downscales the input image.
+    :param max_dimension: maximum dimension of the composite image. 1568x1568 fits within common vision model input limits before downscaling.
     :param burn_timecode: whether to burn in timecode to the image
     :return: a list of dictionaries containing the file name and layout of the composite image
     """

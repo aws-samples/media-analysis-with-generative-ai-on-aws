@@ -126,7 +126,7 @@ Provide your analysis in a structured JSON format:"""
                 # Call Nova Lite model
                 start_time = time.time()
                 # Get model ID from global config or use default
-                model_id = globals().get('AUDIO_MODEL_ID', 'amazon.nova-lite-v1:0')
+                model_id = globals().get('AUDIO_MODEL_ID', 'us.amazon.nova-lite-v1:0')
                 response = self.bedrock_client.invoke_model(
                     modelId=model_id,
                     body=json.dumps({
@@ -269,7 +269,7 @@ Guidelines:
                 print(f"🕐 Model invoked at: {datetime.now().strftime('%H:%M:%S')}")
                 start_time = time.time()
                 # Get model ID from global config or use default
-                model_id = globals().get('AUDIO_MODEL_ID', 'amazon.nova-lite-v1:0')
+                model_id = globals().get('AUDIO_MODEL_ID', 'us.amazon.nova-lite-v1:0')
                 response = self.bedrock_client.invoke_model(
                     modelId=model_id,
                     body=json.dumps({

@@ -21,8 +21,15 @@ import numpy as np
 from numpy import dot
 from numpy.linalg import norm
 
-TITAN_MODEL_ID = 'amazon.titan-embed-image-v1'
-TITAN_PRICING = 0.00006
+TITAN_PRICING = 0.00006  # retained for reference; not used
+
+# Amazon Nova Multimodal Embeddings — unified text/image/video/audio embedding model.
+# Launched Oct 28, 2025. us-east-1 only (no Geo/Global cross-region inference).
+# We pin a dedicated bedrock-runtime client to us-east-1 regardless of the
+# learner's workshop region; only these small embedding calls cross regions.
+EMBEDDING_MODEL_ID = 'amazon.nova-2-multimodal-embeddings-v1:0'
+EMBEDDING_MODEL_REGION = 'us-east-1'
+EMBEDDING_DIMENSION = 1024  # Nova MM Embed supports 256 / 512 / 1024 / 3072 via MRL
 
 config = {
    "LAPLACIAN_PATH": "laplacian",
@@ -41,7 +48,7 @@ class Frame:
         self.laplacian_variance = self.compute_laplacian_variance(ksize=3)
         self.perceptual_hash = self.compute_phash()
         self.make_laplacian_image(self.image_file, ksize=21)
-        self.make_titan_multimodal_embedding()
+        self.make_multimodal_embedding()
 
     def compute_laplacian_variance(self, ksize=3):
         """
@@ -72,44 +79,59 @@ class Frame:
 
         return None
 
-    def make_titan_multimodal_embedding(self):
+    def make_multimodal_embedding(self):
         """
-        Creates an image embedding. This function uses titan multimodal embedding model to create an embedding for the image frame.
-        
+        Creates an image embedding using Amazon Nova Multimodal Embeddings on Amazon Bedrock.
+        The model supports text, image, video, and audio inputs and produces embeddings
+        in a unified vector space for cross-modal retrieval.
+
+        Note: Nova Multimodal Embeddings is currently only available in us-east-1, so we
+        construct a dedicated bedrock-runtime client pinned to that region. Only this small
+        embedding call crosses regions; the rest of the workshop continues to run in the
+        learner's default region.
+
         Args:
            None
-        
+
         """
 
-        titan_model_id = TITAN_MODEL_ID
+        model_id = EMBEDDING_MODEL_ID
         accept = 'application/json'
         content_type = 'application/json'
 
-        bedrock_runtime_client = boto3.client(service_name='bedrock-runtime')
+        bedrock_runtime_client = boto3.client(
+            service_name='bedrock-runtime',
+            region_name=EMBEDDING_MODEL_REGION,
+        )
 
         with Image.open(self.image_file) as image:
             input_image = image_utils.image_to_base64(image)
 
         model_params = {
-            'inputImage': input_image,
-            'embeddingConfig': {
-                'outputEmbeddingLength': 384 #1024 #384 #256
-            }
+            'taskType': 'SINGLE_EMBEDDING',
+            'singleEmbeddingParams': {
+                'embeddingPurpose': 'GENERIC_INDEX',
+                'embeddingDimension': EMBEDDING_DIMENSION,
+                'image': {
+                    'format': 'jpeg',
+                    'source': {'bytes': input_image},
+                },
+            },
         }
 
         body = json.dumps(model_params)
 
         response = bedrock_runtime_client.invoke_model(
             body=body,
-            modelId=titan_model_id,
+            modelId=model_id,
             accept=accept,
             contentType=content_type
         )
         response_body = json.loads(response.get('body').read())
 
-        self.titan_multimodal_embedding = response_body['embedding']
-        self.titan_multimodal_embedding_model_id = titan_model_id
-        self.titan_multimodal_embedding_cost = 0.00006
+        self.multimodal_embedding = response_body['embeddings'][0]['embedding']
+        self.multimodal_embedding_model_id = model_id
+        self.multimodal_embedding_cost = 0.0  # see Amazon Bedrock pricing page
 
         return
 

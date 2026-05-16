@@ -47,8 +47,8 @@ class Shots():
         for i in range(1, len(frames.frames)):
             prev = current_shot[-1]
             cur = frames.frames[i]
-            prev_embedding = prev['titan_multimodal_embedding']
-            cur_embedding = cur['titan_multimodal_embedding']
+            prev_embedding = prev['multimodal_embedding']
+            cur_embedding = cur['multimodal_embedding']
     
             similarity = frames.cosine_similarity(prev_embedding, cur_embedding)
             cur['similarity'] = similarity

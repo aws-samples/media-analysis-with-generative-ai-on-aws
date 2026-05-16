@@ -9,12 +9,12 @@ from lib import frame_utils
 
 
 
-#MODEL_ID = 'anthropic.claude-3-haiku-20240307-v1:0'
-#CLAUDE_PRICING = (0.00025, 0.00125)
-#MODEL_VER = 'bedrock-2023-05-31'
-
-MODEL_ID = 'anthropic.claude-3-sonnet-20240229-v1:0'
-CLAUDE_PRICING = (0.003, 0.015)
+# NOTE: This helper module is kept for historical reference but is not imported
+# by the current Module 2 notebooks. They call Bedrock directly via the
+# Converse API. Default model updated to the current Module 2 default so anyone
+# re-using this helper gets a working model out of the box.
+MODEL_ID = 'global.amazon.nova-2-lite-v1:0'
+CLAUDE_PRICING = (0.003, 0.015)  # retained for compatibility; not representative of Nova pricing
 MODEL_VER = 'bedrock-2023-05-31'
 
 def analyze_conversations(transcript_file):
